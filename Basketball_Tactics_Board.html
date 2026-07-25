@@ -1,17 +1,459 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <!-- 文字コードをUTF-8に固定します。 -->
+  <meta charset="UTF-8" />
+  <!-- スマートフォンとタブレットで画面幅を正しく扱います。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <!-- ブラウザーのテーマ色を指定します。 -->
   <meta name="theme-color" content="#111827" />
+  <!-- アプリの説明を設定します。 -->
   <meta name="description" content="タブレットで直感的に使えるバスケットボール作戦ボード" />
-  <link rel="manifest" href="./manifest.webmanifest" />
+  <!-- PWA用のマニフェストを読み込みます。 -->
+  <link rel="manifest" href="./1_App/manifest.webmanifest" />
+  <!-- iPadのホーム画面から単独アプリとして起動できるようにします。 -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <!-- iPadでのステータスバー表示を指定します。 -->
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <!-- iPadのホーム画面に表示するアプリ名です。 -->
   <meta name="apple-mobile-web-app-title" content="Tactics Board" />
+  <!-- iPadのホーム画面に表示するアイコンです。 -->
+  <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
+  <!-- 画面デザイン用のCSSを読み込みます。 -->
+  <link rel="stylesheet" href="./1_App/css/styles.css" />
+  <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
-  <style>html,body{height:100%;margin:0;background:#f3f4f6;font-family:system-ui,sans-serif}body{display:grid;place-items:center;color:#111827}.loading{font-weight:700;letter-spacing:.02em}</style>
-  <script type="module" src="./boot.js"></script>
 </head>
-<body><div class="loading">作戦ボードを読み込んでいます…</div></body>
+<body>
+  <!-- アプリ全体を包む領域です。 -->
+  <main class="app-shell">
+    <!-- 上部ヘッダーです。 -->
+    <header class="topbar">
+      <!-- アプリ名と作戦名をまとめます。 -->
+      <div class="brand-area">
+        <!-- アプリの簡易ロゴです。 -->
+        <div class="brand-mark" aria-hidden="true"><img src="./1_App/img/coach_icon.png" alt="" /></div>
+        <!-- 作戦名入力欄を含む領域です。 -->
+        <div class="brand-copy">
+          <!-- アプリ名です。 -->
+          <p class="eyebrow">TACTICS BOARD</p>
+          <!-- 作戦名を入力します。 -->
+          <input id="playName" class="play-name" type="text" value="新しい作戦" maxlength="50" aria-label="作戦名" />
+          <div class="play-meta-inline">
+            <select id="playFolder" class="meta-select" aria-label="保存フォルダ">
+              <option value="Shared">Shared</option>
+              <option value="U12/Offense">U12 / Offense</option>
+              <option value="U12/Defense">U12 / Defense</option>
+              <option value="U12/SLOB">U12 / SLOB</option>
+              <option value="U12/BLOB">U12 / BLOB</option>
+              <option value="U12/Practice">U12 / Practice</option>
+              <option value="U15/Offense">U15 / Offense</option>
+              <option value="U15/Defense">U15 / Defense</option>
+              <option value="U15/SLOB">U15 / SLOB</option>
+              <option value="U15/BLOB">U15 / BLOB</option>
+              <option value="U15/Practice">U15 / Practice</option>
+            </select>
+            <input id="playTags" class="meta-input" type="text" placeholder="タグ：ゾーン, プレス" maxlength="100" aria-label="タグ" />
+            <label class="favorite-toggle"><input id="playFavorite" type="checkbox" /> ★ お気に入り</label>
+          </div>
+        </div>
+      </div>
+      <!-- 保存・読込・出力の操作をまとめます。 -->
+      <div class="top-actions">
+        <!-- 現在の作戦を個人用OneDriveへ保存します。 -->
+        <button id="savePlayButton" class="button primary" type="button">作戦保存</button>
+        <!-- OneDrive内の作戦一覧を開きます。 -->
+        <button id="openLibraryButton" class="button" type="button">ライブラリ</button>
+        <!-- 個人用OneDriveの接続状態と設定を開きます。 -->
+        <button id="oneDriveButton" class="button onedrive-button" type="button">OneDrive設定</button>
+        <!-- 現在の作戦データをJSONファイルへ書き出します。 -->
+        <button id="exportJsonButton" class="button" type="button">JSON保存</button>
+        <!-- JSONファイルから作戦データを読み込みます。 -->
+        <button id="importJsonButton" class="button" type="button">JSON読込</button>
+        <!-- JSON読込で使う非表示のファイル選択欄です。 -->
+        <input id="importJsonInput" type="file" accept="application/json,.json" hidden />
+        <!-- 現在のボードをPNG画像にします。 -->
+        <button id="exportButton" class="button" type="button">PNG</button>
+      </div>
+    </header>
+
+    <!-- メインの操作領域です。 -->
+    <section class="workspace">
+      <!-- 左側のツールパネルです。 -->
+      <aside class="tool-panel" aria-label="描画ツール">
+        <!-- 選択ツールです。 -->
+        <button class="tool-button active" type="button" data-tool="select" title="選択・移動">
+          <span class="tool-icon">☝</span>
+          <span>選択</span>
+        </button>
+        <!-- 選手の移動線を描きます。 -->
+        <button class="tool-button" type="button" data-tool="move" title="選手移動">
+          <span class="tool-icon">➜</span>
+          <span>移動</span>
+        </button>
+        <!-- パス線を描きます。 -->
+        <button class="tool-button" type="button" data-tool="pass" title="パス">
+          <span class="tool-icon">⇢</span>
+          <span>パス</span>
+        </button>
+        <!-- 指で自由な軌道を描くドリブル線です。 -->
+        <button class="tool-button" type="button" data-tool="dribbleFree" title="フリーハンドのドリブル">
+          <span class="tool-icon">〰</span>
+          <span>ドリブル曲</span>
+        </button>
+        <!-- 始点から終点まで直線で描くドリブル線です。 -->
+        <button class="tool-button" type="button" data-tool="dribbleStraight" title="直線のドリブル">
+          <span class="tool-icon">⇝</span>
+          <span>ドリブル直</span>
+        </button>
+        <!-- 指で自由な軌道を描き、終点にスクリーン記号を付けます。 -->
+        <button class="tool-button" type="button" data-tool="screenFree" title="フリーハンドのスクリーン移動">
+          <span class="tool-icon">↝⊥</span>
+          <span>スクリーン曲</span>
+        </button>
+        <!-- 始点から終点まで直線で移動し、終点にスクリーン記号を付けます。 -->
+        <button class="tool-button" type="button" data-tool="screenStraight" title="直線のスクリーン移動">
+          <span class="tool-icon">→⊥</span>
+          <span>スクリーン直</span>
+        </button>
+        <!-- 指で自由な線を描きます。 -->
+        <button class="tool-button" type="button" data-tool="free" title="フリーハンド">
+          <span class="tool-icon">✎</span>
+          <span>自由線</span>
+        </button>
+        <!-- コート上へ自由なテキストを配置します。 -->
+        <button class="tool-button" type="button" data-tool="text" title="テキストを配置">
+          <span class="tool-icon">T</span>
+          <span>テキスト</span>
+        </button>
+        <!-- 描画した線を消します。 -->
+        <button class="tool-button" type="button" data-tool="erase" title="線を削除">
+          <span class="tool-icon">⌫</span>
+          <span>消す</span>
+        </button>
+      </aside>
+
+      <!-- 中央のボード領域です。 -->
+      <section class="board-column">
+        <!-- コート種別と履歴操作をまとめます。 -->
+        <div class="board-controls">
+          <!-- コート表示を切り替えます。 -->
+          <div class="segmented" role="group" aria-label="コート表示">
+            <button id="halfCourtButton" class="segment active" type="button">ハーフ</button>
+            <button id="fullCourtButton" class="segment" type="button">フル</button>
+          </div>
+          <!-- 現在選択中のツールを表示します。 -->
+          <div id="toolStatus" class="status-pill">選択・移動</div>
+          <!-- 履歴と初期化ボタンです。 -->
+          <div class="history-actions">
+            <button id="undoButton" class="icon-button" type="button" title="元に戻す">↶</button>
+            <button id="redoButton" class="icon-button" type="button" title="やり直す">↷</button>
+            <button id="clearLinesButton" class="button compact" type="button">線を消去</button>
+            <button id="maximizeCourtButton" class="button compact" type="button">⛶ コート最大化</button>
+            <button id="resetButton" class="button compact danger" type="button">初期化</button>
+          </div>
+        </div>
+
+        <!-- Canvasを配置する外枠です。 -->
+        <div id="canvasShell" class="canvas-shell">
+          <!-- 作戦ボード本体です。 -->
+          <canvas id="tacticsCanvas" aria-label="バスケットボール作戦ボード"></canvas>
+          <!-- 操作ヒントを重ねて表示します。 -->
+          <div id="canvasHint" class="canvas-hint">移動・ドリブル・スクリーンは選手から描くと、その軌道に沿って再生されます</div>
+          <!-- コート最大化時に使う最小操作ボタンです。 -->
+          <div id="focusControls" class="focus-controls" aria-label="最大表示の操作">
+            <!-- 最大表示を終了します。 -->
+            <button id="exitFocusButton" class="focus-button" type="button">✕ 閉じる</button>
+            <!-- 一つ前の動作またはSTEPへ戻ります。 -->
+            <button id="focusPreviousFrameButton" class="focus-button" type="button">◀ 前へ</button>
+            <!-- 最大表示のまま全STEPを連続再生します。 -->
+            <button id="focusPlayButton" class="focus-button primary" type="button">▶ 連続</button>
+            <!-- 次の動作またはSTEPへ進みます。 -->
+            <button id="focusNextFrameButton" class="focus-button" type="button">次へ ▶</button>
+          </div>
+          <!-- 最大表示中のSTEP一覧です。 -->
+          <div id="focusStepList" class="focus-step-list" aria-label="最大表示中の作戦ステップ"></div>
+          <!-- 最大表示中の編集ツールを表示します。 -->
+          <div id="focusEditorPanel" class="focus-editor-panel" aria-label="最大表示中の編集ツール">
+            <!-- 最大表示中でも選択・描画ツールを切り替えられます。 -->
+            <div class="focus-editor-tools">
+              <button class="focus-tool-button" type="button" data-tool="select" title="選択・移動">☝</button>
+              <button class="focus-tool-button" type="button" data-tool="move" title="選手移動">➜</button>
+              <button class="focus-tool-button" type="button" data-tool="pass" title="パス">⇢</button>
+              <button class="focus-tool-button" type="button" data-tool="dribbleFree" title="ドリブル曲線">〰</button>
+              <button class="focus-tool-button" type="button" data-tool="dribbleStraight" title="ドリブル直線">⇝</button>
+              <button class="focus-tool-button" type="button" data-tool="screenFree" title="スクリーン曲線">↝⊥</button>
+              <button class="focus-tool-button" type="button" data-tool="screenStraight" title="スクリーン直線">→⊥</button>
+              <button class="focus-tool-button" type="button" data-tool="free" title="自由線">✎</button>
+              <button class="focus-tool-button" type="button" data-tool="text" title="テキスト">T</button>
+              <button class="focus-tool-button cone-red" type="button" data-add-cone="red" title="赤コーンを追加">▲</button>
+              <button class="focus-tool-button cone-blue" type="button" data-add-cone="blue" title="青コーンを追加">▲</button>
+              <button class="focus-tool-button" type="button" data-tool="erase" title="線・テキスト・コーンを削除">⌫</button>
+            </div>
+            <!-- 最大表示中の線色を選択します。 -->
+            <div class="focus-editor-colors" role="group" aria-label="最大表示中の線色">
+              <button class="focus-color-button active" type="button" data-line-color="black" aria-label="黒"></button>
+              <button class="focus-color-button red" type="button" data-line-color="red" aria-label="赤"></button>
+              <button class="focus-color-button blue" type="button" data-line-color="blue" aria-label="青"></button>
+              <button id="focusUndoButton" class="focus-mini-button" type="button" title="元に戻す">↶</button>
+              <button id="focusRedoButton" class="focus-mini-button" type="button" title="やり直す">↷</button>
+            </div>
+          </div>
+          <!-- 右下の薄いボタンで最大表示中の編集ツールを開閉します。 -->
+          <button id="focusEditorToggleButton" class="focus-editor-toggle" type="button" aria-expanded="false" title="編集ツールを表示">✎</button>
+        </div>
+
+        <!-- STEP操作領域です。 -->
+        <div class="step-panel">
+          <!-- STEP一覧を配置します。 -->
+          <div id="stepList" class="step-list" aria-label="作戦ステップ"></div>
+          <!-- STEPの追加・削除・再生を行います。 -->
+          <div class="step-actions">
+            <button id="addStepButton" class="button" type="button">＋ STEP複製</button>
+            <button id="deleteStepButton" class="button danger" type="button">削除</button>
+            <button id="previousFrameButton" class="button" type="button">◀ 前へ</button>
+            <button id="nextFrameButton" class="button" type="button">次へ ▶</button>
+            <button id="playStepsButton" class="button primary" type="button">▶ 連続再生</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右側の情報パネルです。 -->
+      <aside class="detail-panel">
+        <!-- 線色と表示方法を設定します。 -->
+        <section class="panel-card display-settings">
+          <h2>描画・表示設定</h2>
+          <!-- 新しく描く線の色を選択します。 -->
+          <div class="setting-group">
+            <span class="setting-label">線の色</span>
+            <div class="color-selector" role="group" aria-label="線の色">
+              <button class="color-button active" type="button" data-line-color="black" aria-label="黒" title="黒"></button>
+              <button class="color-button red" type="button" data-line-color="red" aria-label="赤" title="赤"></button>
+              <button class="color-button blue" type="button" data-line-color="blue" aria-label="青" title="青"></button>
+            </div>
+          </div>
+          <!-- コート上の選手マーカーサイズを切り替えます。 -->
+          <div class="setting-group">
+            <span class="setting-label">選手サイズ</span>
+            <div class="player-size-selector" role="group" aria-label="選手サイズ">
+              <button class="player-size-button active" type="button" data-player-size="large" aria-label="大" title="大">大</button>
+              <button class="player-size-button" type="button" data-player-size="medium" aria-label="中" title="中">中</button>
+              <button class="player-size-button" type="button" data-player-size="small" aria-label="小" title="小">小</button>
+            </div>
+          </div>
+          <!-- 選手とボールが線上を移動する速度を調整します。 -->
+          <div class="speed-setting">
+            <label for="movementSpeedRange"><span>移動速度</span><output id="movementSpeedValue">1.00×</output></label>
+            <input id="movementSpeedRange" type="range" min="0.5" max="2" step="0.25" value="1" />
+          </div>
+          <!-- 連続再生時の動作間とSTEP間のテンポを調整します。 -->
+          <div class="speed-setting">
+            <label for="playbackSpeedRange"><span>連続再生速度</span><output id="playbackSpeedValue">1.00×</output></label>
+            <input id="playbackSpeedRange" type="range" min="0.5" max="2" step="0.25" value="1" />
+          </div>
+          <!-- 移動線の表示を切り替えます。 -->
+          <label class="switch-row" for="showMovementLinesToggle">
+            <span>移動線を表示</span>
+            <input id="showMovementLinesToggle" type="checkbox" checked />
+          </label>
+          <!-- 最大表示中の再生ボタンを切り替えます。 -->
+          <label class="switch-row" for="focusPlayToggle">
+            <span>最大化時：再生ボタン</span>
+            <input id="focusPlayToggle" type="checkbox" checked />
+          </label>
+          <!-- 最大表示中のSTEP一覧を切り替えます。 -->
+          <label class="switch-row" for="focusStepsToggle">
+            <span>最大化時：STEP一覧</span>
+            <input id="focusStepsToggle" type="checkbox" checked />
+          </label>
+        </section>
+        <!-- オフェンスとディフェンスの背番号マーカーを0番から18番まで切り替えます。 -->
+        <section class="panel-card player-manager-card">
+          <div class="player-manager-header">
+            <div>
+              <h2>選手番号</h2>
+              <p>番号を押すと、現在STEPへ追加・削除します。</p>
+            </div>
+          </div>
+          <div class="player-number-section offense">
+            <span class="player-number-title">オフェンス 0〜18</span>
+            <div id="offenseNumberGrid" class="player-number-grid" aria-label="オフェンス選手番号"></div>
+          </div>
+          <div class="player-number-section defense">
+            <span class="player-number-title">ディフェンス 0〜18</span>
+            <div id="defenseNumberGrid" class="player-number-grid" aria-label="ディフェンス選手番号"></div>
+          </div>
+        </section>
+        <!-- 練習用コーンを赤と青で追加します。 -->
+        <section class="panel-card cone-manager-card">
+          <div class="cone-manager-header">
+            <div>
+              <h2>コーン</h2>
+              <p>追加後は選択で移動、消すで削除できます。</p>
+            </div>
+          </div>
+          <div class="cone-actions">
+            <button class="cone-add-button red" type="button" data-add-cone="red"><span>▲</span>赤コーン追加 <b id="redConeCount">0</b></button>
+            <button class="cone-add-button blue" type="button" data-add-cone="blue"><span>▲</span>青コーン追加 <b id="blueConeCount">0</b></button>
+          </div>
+        </section>
+        <!-- STEP内の動作順を設定します。 -->
+        <section class="panel-card action-order-card">
+          <div class="action-order-header">
+            <div>
+              <h2>動作順</h2>
+              <p>同じ番号の移動・スクリーンは同時再生。パスとドリブルは描画順です。</p>
+            </div>
+            <button id="resetActionOrderButton" class="button compact" type="button">初期値</button>
+          </div>
+          <div id="actionOrderList" class="action-order-list" aria-label="現在STEPの動作順"></div>
+        </section>
+        <!-- 凡例を表示します。 -->
+        <section class="panel-card">
+          <h2>凡例</h2>
+          <div class="legend-row"><span class="legend-line solid"></span><span>選手の移動</span></div>
+          <div class="legend-row"><span class="legend-line dashed"></span><span>パス</span></div>
+          <div class="legend-row"><span class="legend-line wavy">〰</span><span>ドリブル（曲線／直線）</span></div>
+          <div class="legend-row"><span class="legend-line screen">⊥</span><span>スクリーン移動（曲線／直線）</span></div>
+          <div class="legend-row"><span class="legend-line free">✎</span><span>自由線</span></div>
+          <div class="legend-row"><span class="legend-line free">T</span><span>テキスト（選択で移動・ダブルクリックで編集）</span></div>
+          <div class="legend-row"><span class="legend-line cone">▲</span><span>赤・青コーン（選択で移動）</span></div>
+        </section>
+        <!-- コーチングポイントを入力します。 -->
+        <section class="panel-card note-card">
+          <label for="stepNote">コーチングポイント</label>
+          <textarea id="stepNote" rows="8" placeholder="例：5番がスクリーン後にダイブ。1番はヘルプの位置を見て判断する。"></textarea>
+        </section>
+        <!-- 操作ショートカットを表示します。 -->
+        <section class="panel-card shortcuts">
+          <h2>操作</h2>
+          <p><kbd>Ctrl</kbd>＋<kbd>Z</kbd> 元に戻す</p>
+          <p><kbd>Ctrl</kbd>＋<kbd>Y</kbd> やり直す</p>
+          <p><kbd>1〜9</kbd> 描画ツール／<kbd>0</kbd> テキスト</p>
+          <p>前へ・次へ：動作単位のコマ送り</p>
+        </section>
+      </aside>
+    </section>
+  </main>
+
+  <!-- 保存済み作戦一覧のダイアログです。 -->
+  <dialog id="libraryDialog" class="library-dialog">
+    <!-- ダイアログの上部です。 -->
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">CLOUD LIBRARY</p>
+        <h2>OneDrive 作戦ライブラリ</h2>
+      </div>
+      <button id="closeLibraryButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="library-toolbar">
+      <input id="librarySearch" class="meta-input" type="search" placeholder="作戦名・タグ・フォルダを検索" />
+      <select id="libraryFolderFilter" class="meta-select">
+        <option value="">すべてのフォルダ</option>
+        <option value="U12">U12</option>
+        <option value="U15">U15</option>
+        <option value="Shared">Shared</option>
+      </select>
+      <label class="favorite-toggle"><input id="libraryFavoriteOnly" type="checkbox" /> お気に入りのみ</label>
+      <button id="connectFolderButton" class="button compact" type="button">OneDrive設定</button>
+      <button id="refreshLibraryButton" class="button compact" type="button">更新</button>
+    </div>
+    <p id="folderModeMessage" class="folder-mode-message"></p>
+    <!-- 保存作戦の一覧を表示します。 -->
+    <div id="libraryList" class="library-list"></div>
+  </dialog>
+
+  <!-- 個人用OneDriveの接続設定ダイアログです。 -->
+  <dialog id="oneDriveDialog" class="library-dialog onedrive-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">PERSONAL CLOUD</p>
+        <h2>個人用OneDrive</h2>
+      </div>
+      <button id="closeOneDriveButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="onedrive-content">
+      <div id="oneDriveConnectionCard" class="onedrive-status-card" aria-live="polite">
+        <span class="onedrive-cloud-mark" aria-hidden="true">☁</span>
+        <div>
+          <strong id="oneDriveConnectionTitle">初期設定が必要です</strong>
+          <p id="oneDriveConnectionDetail">Microsoft EntraのクライアントIDを設定してください。</p>
+        </div>
+      </div>
+
+      <section class="onedrive-setup-section">
+        <h3>初回だけの設定</h3>
+        <p>Microsoft Entraで作成した「アプリケーション (クライアント) ID」を入力します。クライアントシークレットは不要です。</p>
+        <label class="onedrive-field" for="oneDriveClientId">
+          <span>クライアントID</span>
+          <input id="oneDriveClientId" type="text" inputmode="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" />
+        </label>
+        <label class="onedrive-field" for="oneDriveRedirectUri">
+          <span>Microsoft Entraへ登録するリダイレクトURI</span>
+          <div class="onedrive-copy-row">
+            <input id="oneDriveRedirectUri" type="text" readonly />
+            <button id="copyOneDriveRedirectButton" class="button compact" type="button">コピー</button>
+          </div>
+        </label>
+        <div class="onedrive-config-actions">
+          <button id="saveOneDriveClientIdButton" class="button" type="button">IDをこの端末へ保存</button>
+          <a class="button link-button" href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer">Microsoft Entraを開く</a>
+        </div>
+        <p class="onedrive-help">公開前に <code>1_App/js/onedrive-config.js</code> へ同じIDを書いておくと、PC・iPadごとのID入力は不要です。</p>
+      </section>
+
+      <div class="onedrive-account-actions">
+        <button id="connectOneDriveButton" class="button primary" type="button">Microsoftアカウントで接続</button>
+        <button id="disconnectOneDriveButton" class="button" type="button" hidden>接続を解除</button>
+      </div>
+      <p class="onedrive-privacy">作戦JSONはOneDrive内の「アプリ」専用フォルダだけに保存されます。このアプリからOneDrive内のほかのファイルへはアクセスしません。</p>
+    </div>
+  </dialog>
+
+  <!-- 一時メッセージを表示します。 -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- JavaScriptが正常に起動したかを確認する監視処理です。 -->
+  <script>
+    // ページ全体の読込完了後に起動状態を確認します。
+    window.addEventListener("load", function () {
+      // JavaScript本体の初期化を少し待ちます。
+      window.setTimeout(function () {
+        // アプリが起動済みの場合は何もしません。
+        if (document.documentElement.dataset.appReady === "true") {
+          // 正常終了します。
+          return;
+        }
+        // 起動エラーを表示する要素を作ります。
+        const errorPanel = document.createElement("div");
+        // エラー表示の見た目を直接指定します。
+        errorPanel.style.cssText = "position:fixed;inset:16px;z-index:9999;display:grid;place-items:center;padding:24px;border:2px solid #b91c1c;border-radius:16px;color:#7f1d1d;background:#fff7f7;font:700 16px/1.7 sans-serif;text-align:center;";
+        // 利用者向けの案内文を設定します。
+        errorPanel.textContent = "作戦ボードの起動に失敗しました。ページを再読み込みしてください。";
+        // 画面へエラー表示を追加します。
+        document.body.appendChild(errorPanel);
+      }, 1000);
+    });
+  </script>
+  <!-- HTTPS公開時にアプリ本体を端末へ保存します。 -->
+  <script>
+    // Service Workerに対応したHTTPS環境だけで登録します。
+    if ("serviceWorker" in navigator && window.location.protocol === "https:") {
+      // ページ読込後に登録して初期表示を妨げないようにします。
+      window.addEventListener("load", function () {
+        // GitHub Pagesのリポジトリ配下を基準にService Workerを登録します。
+        navigator.serviceWorker.register("./service-worker.js").catch(function (error) {
+          // 登録失敗はアプリ本体の利用を妨げないため、開発者コンソールだけへ記録します。
+          console.warn("Service Worker registration failed:", error);
+        });
+      });
+    }
+  </script>
+  <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
+  <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
+  <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
+  <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
+  <script defer src="./1_App/js/folder-access.js?v=22"></script>
+  <script defer src="./1_App/js/app.js?v=22"></script>
+</body>
 </html>
