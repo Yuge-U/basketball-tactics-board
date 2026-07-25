@@ -2173,3 +2173,59 @@ body.mobile-layout .panel-card {
     display: flex;
   }
 }
+
+/* v29: タグ欄はヘッダーを占有しすぎない固定幅にします。 */
+.play-meta-inline .meta-input {
+  width: min(160px, 16vw);
+  min-width: 72px;
+  max-width: 160px;
+  flex: 0 1 160px;
+}
+
+/* v29: ヘッダーのSVGアイコンを同じ線画スタイルへ揃えます。 */
+.top-actions .top-action-icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* v29: iOS/iPadOSのステータスバー・ノッチ・ホームインジケータを避けます。 */
+@supports (padding: max(0px)) {
+  .topbar {
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-right: max(10px, env(safe-area-inset-right));
+    padding-left: max(10px, env(safe-area-inset-left));
+  }
+
+  body.mobile-layout .topbar {
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-left: max(8px, env(safe-area-inset-left));
+  }
+
+  body.mobile-layout .workspace {
+    padding-right: max(6px, env(safe-area-inset-right));
+    padding-bottom: max(2px, env(safe-area-inset-bottom));
+    padding-left: max(6px, env(safe-area-inset-left));
+  }
+
+  body.board-focus .focus-controls {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  body.board-focus .focus-step-list {
+    bottom: max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 600px) {
+  body.mobile-layout .play-meta-inline .meta-input {
+    display: none;
+  }
+}

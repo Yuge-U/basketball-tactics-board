@@ -1,1 +1,1 @@
-Basketball Tactics Board v28 - Stable court history / icon court controls / iPad-iPhone layout
+Basketball Tactics Board v29 - Compact markers / fixed ball scale / iOS safe area / folder-camera icons
