@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=27" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=28" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -54,12 +54,19 @@
               <option value="U15/Practice">U15 / Practice</option>
             </select>
             <input id="playTags" class="meta-input" type="text" placeholder="タグ：ゾーン, プレス" maxlength="100" aria-label="タグ" />
-            <label class="favorite-toggle"><input id="playFavorite" type="checkbox" /> ★ お気に入り</label>
+            <label class="favorite-toggle play-favorite-toggle" title="お気に入り">
+              <input id="playFavorite" type="checkbox" aria-label="お気に入り" />
+              <span class="favorite-star" aria-hidden="true"></span>
+            </label>
           </div>
         </div>
       </div>
       <!-- 保存・読込・出力の操作をまとめます。 -->
       <div class="top-actions">
+        <!-- iPad・iPhone向けのタッチ操作レイアウトへ切り替えます。 -->
+        <button id="mobileLayoutButton" class="button icon-only-button top-action-icon mobile-layout-button" type="button" aria-label="モバイル表示に切り替え" title="モバイル表示に切り替え" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="2.4"></rect><line x1="10" y1="18.5" x2="14" y2="18.5"></line></svg>
+        </button>
         <!-- 現在の作戦を個人用OneDriveへ保存します。 -->
         <button id="savePlayButton" class="button primary icon-only-button top-action-icon" type="button" aria-label="作戦を保存" title="作戦を保存">💾</button>
         <!-- OneDrive内の作戦一覧を開きます。 -->
@@ -139,8 +146,12 @@
         <div class="board-controls">
           <!-- コート表示を切り替えます。 -->
           <div class="segmented" role="group" aria-label="コート表示">
-            <button id="halfCourtButton" class="segment active" type="button">ハーフ</button>
-            <button id="fullCourtButton" class="segment" type="button">フル</button>
+            <button id="halfCourtButton" class="segment court-mode-button active" type="button" aria-label="ハーフコート" title="ハーフコート">
+              <svg viewBox="0 0 34 24" aria-hidden="true"><rect x="1.5" y="1.5" width="31" height="21" rx="2"></rect><line x1="1.5" y1="6.5" x2="32.5" y2="6.5"></line><path d="M11 6.5a6 6 0 0 0 12 0"></path><circle cx="17" cy="4.7" r="1.2"></circle></svg>
+            </button>
+            <button id="fullCourtButton" class="segment court-mode-button" type="button" aria-label="フルコート" title="フルコート">
+              <svg viewBox="0 0 34 24" aria-hidden="true"><rect x="1.5" y="1.5" width="31" height="21" rx="2"></rect><line x1="17" y1="1.5" x2="17" y2="22.5"></line><circle cx="17" cy="12" r="4"></circle><path d="M1.5 7a7 7 0 0 1 0 10M32.5 7a7 7 0 0 0 0 10"></path></svg>
+            </button>
           </div>
           <!-- 現在選択中のツールを表示します。 -->
           <div id="toolStatus" class="status-pill">選択・移動</div>
@@ -443,6 +454,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=27"></script>
+  <script defer src="./1_App/js/app.js?v=28"></script>
 </body>
 </html>

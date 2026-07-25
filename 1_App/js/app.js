@@ -3,7 +3,7 @@ const HALF_COURT = { width: 1050, height: 980 };
 // 全面コートをFIBA寸法比の28m×15mで扱う論理サイズを定義します。
 const FULL_COURT = { width: 1120, height: 600 };
 // スローイン配置に使うコート外周の論理余白を定義します。
-const COURT_OUTER_MARGIN = 76;
+const COURT_OUTER_MARGIN = 60;
 // v8の半面コート論理サイズを移行処理用に定義します。
 const V8_HALF_COURT = { width: 1280, height: 760 };
 // v6までの半面コート論理サイズを移行処理用に定義します。
@@ -41,8 +41,18 @@ function normalizePlayerSize(value) {
 
 // 現在選択中の選手表示設定を返します。
 function getPlayerStyle() {
-  // 状態のサイズ名を補正して対応設定を返します。
-  return PLAYER_SIZES[normalizePlayerSize(state?.playerSize)];
+  // 状態のサイズ名を補正して画面上の見た目サイズを取得します。
+  const displayStyle = PLAYER_SIZES[normalizePlayerSize(state?.playerSize)];
+  // コート種別や表示倍率にかかわらず同じピクセル寸法になるよう論理値へ戻します。
+  const displayScale = Math.max(0.01, Number(viewport?.scale) || 1);
+  // iPhone幅では同じサイズ区分を保ちながらタッチ画面へ収まる寸法にします。
+  const deviceScale = mobileLayoutEnabled && window.innerWidth <= 600 ? 0.78 : 1;
+  // Canvas拡大縮小後も一定に見える描画設定を返します。
+  return {
+    radius: displayStyle.radius * deviceScale / displayScale,
+    fontSize: displayStyle.fontSize * deviceScale / displayScale,
+    lineWidth: displayStyle.lineWidth * deviceScale / displayScale
+  };
 }
 
 // 現在選択中の選手半径を返します。
@@ -79,6 +89,8 @@ const TEXT_FONT_SIZE = 34;
 const AUTOSAVE_KEY = "basketball-tactics-autosave-v1";
 // 作戦ライブラリに使うキーを定義します。
 const LIBRARY_KEY = "basketball-tactics-library-v1";
+// モバイル表示の選択を端末ごとに保持するキーです。
+const MOBILE_LAYOUT_KEY = "basketball-tactics-mobile-layout-v1";
 // 選択可能な線色を定義します。
 const LINE_COLORS = {
   // 黒線の色です。
@@ -237,6 +249,8 @@ const libraryList = document.getElementById("libraryList");
 const playFolderInput = document.getElementById("playFolder");
 const playTagsInput = document.getElementById("playTags");
 const playFavoriteInput = document.getElementById("playFavorite");
+const playFavoriteLabel = document.querySelector(".play-favorite-toggle");
+const mobileLayoutButton = document.getElementById("mobileLayoutButton");
 const librarySearchInput = document.getElementById("librarySearch");
 const libraryFolderFilter = document.getElementById("libraryFolderFilter");
 const libraryFavoriteOnly = document.getElementById("libraryFavoriteOnly");
@@ -307,6 +321,47 @@ const nextFrameButton = document.getElementById("nextFrameButton");
 const focusPreviousFrameButton = document.getElementById("focusPreviousFrameButton");
 // 最大表示の次へボタンを取得します。
 const focusNextFrameButton = document.getElementById("focusNextFrameButton");
+let mobileLayoutEnabled = false;
+
+// お気に入り星アイコンのヒントを現在状態へ合わせます。
+function syncFavoriteHint() {
+  if (!playFavoriteInput || !playFavoriteLabel) return;
+  const hint = playFavoriteInput.checked ? "お気に入りから外す" : "お気に入りに追加";
+  playFavoriteInput.setAttribute("aria-label", hint);
+  playFavoriteLabel.title = hint;
+}
+
+// 端末幅・タッチ操作と保存済み設定から初回レイアウトを決めます。
+function getInitialMobileLayout() {
+  try {
+    const stored = localStorage.getItem(MOBILE_LAYOUT_KEY);
+    if (stored === "true" || stored === "false") return stored === "true";
+  } catch {
+    // 保存領域を利用できない場合は端末判定を使います。
+  }
+  return window.matchMedia("(max-width: 820px), (pointer: coarse)").matches;
+}
+
+// iPad・iPhone向けのタッチ操作レイアウトを切り替えます。
+function setMobileLayout(enabled, persist = true) {
+  mobileLayoutEnabled = Boolean(enabled);
+  document.body.classList.toggle("mobile-layout", mobileLayoutEnabled);
+  mobileLayoutButton?.classList.toggle("active", mobileLayoutEnabled);
+  mobileLayoutButton?.setAttribute("aria-pressed", String(mobileLayoutEnabled));
+  const hint = mobileLayoutEnabled ? "デスクトップ表示に戻す" : "モバイル表示に切り替え";
+  if (mobileLayoutButton) {
+    mobileLayoutButton.setAttribute("aria-label", hint);
+    mobileLayoutButton.title = hint;
+  }
+  if (persist) {
+    try {
+      localStorage.setItem(MOBILE_LAYOUT_KEY, String(mobileLayoutEnabled));
+    } catch {
+      // 保存できなくても現在の表示切替は維持します。
+    }
+  }
+  window.setTimeout(resizeCanvas, 40);
+}
 
 // ツール名の表示文言を定義します。
 const TOOL_LABELS = {
@@ -613,6 +668,7 @@ function applySnapshot(snapshot) {
   if (playFolderInput) playFolderInput.value = state.libraryMeta.folder || "Shared";
   if (playTagsInput) playTagsInput.value = (state.libraryMeta.tags || []).join(", ");
   if (playFavoriteInput) playFavoriteInput.checked = Boolean(state.libraryMeta.favorite);
+  syncFavoriteHint();
   // コート種別を復元します。
   state.courtMode = migrated.courtMode ?? "half";
   // 選択中の線色を復元します。
@@ -682,6 +738,8 @@ function undo() {
   const snapshot = undoStack.pop();
   // 状態を復元します。
   applySnapshot(snapshot);
+  // コート種別が変わった場合も外枠比率とCanvas変換を即時更新します。
+  resizeCanvas();
   // ボタン状態を更新します。
   updateHistoryButtons();
   // 操作結果を通知します。
@@ -700,6 +758,8 @@ function redo() {
   const snapshot = redoStack.pop();
   // 状態を復元します。
   applySnapshot(snapshot);
+  // コート種別が変わった場合も外枠比率とCanvas変換を即時更新します。
+  resizeCanvas();
   // ボタン状態を更新します。
   updateHistoryButtons();
   // 操作結果を通知します。
@@ -720,8 +780,10 @@ function resizeCanvas() {
     const availableWidth = canvasShell.parentElement?.clientWidth || window.innerWidth;
     // Canvas上端から画面下端までの高さを取得します。
     const top = canvasShell.getBoundingClientRect().top;
-    // コンパクトなSTEP操作分だけを残し、コートへ使える高さを最大化します。
-    const availableHeight = Math.max(300, window.innerHeight - top - 48);
+    // モバイル表示ではSTEP操作と横ツール列、通常表示ではSTEP操作分を残します。
+    const controlReserve = mobileLayoutEnabled ? 106 : 42;
+    // 残りの画面高をコートへ最大限割り当てます。
+    const availableHeight = Math.max(300, window.innerHeight - top - controlReserve);
     // 横幅と高さの両方へ収まる表示幅を計算します。
     const fittedWidth = Math.min(availableWidth, availableHeight * courtRatio);
     // 計算した幅を設定します。
@@ -4694,7 +4756,12 @@ if (libraryFolderFilter) libraryFolderFilter.addEventListener("change", renderLi
 if (libraryFavoriteOnly) libraryFavoriteOnly.addEventListener("change", renderLibrary);
 if (playFolderInput) playFolderInput.addEventListener("change", () => { state.libraryMeta = {...(state.libraryMeta||{}), folder: playFolderInput.value}; autosave(); });
 if (playTagsInput) playTagsInput.addEventListener("change", () => { state.libraryMeta = {...(state.libraryMeta||{}), tags: playTagsInput.value.split(",").map((tag)=>tag.trim()).filter(Boolean)}; autosave(); });
-if (playFavoriteInput) playFavoriteInput.addEventListener("change", () => { state.libraryMeta = {...(state.libraryMeta||{}), favorite: playFavoriteInput.checked}; autosave(); });
+if (playFavoriteInput) playFavoriteInput.addEventListener("change", () => {
+  state.libraryMeta = { ...(state.libraryMeta || {}), favorite: playFavoriteInput.checked };
+  syncFavoriteHint();
+  autosave();
+});
+mobileLayoutButton?.addEventListener("click", () => setMobileLayout(!mobileLayoutEnabled));
 window.addEventListener("load", async () => {
   await window.PlayFolderAccess?.restore();
   window.OneDriveStorage?.onStatusChange(updateOneDriveInterface);
@@ -4775,6 +4842,10 @@ oneDriveDialog?.addEventListener("click", (event) => {
 
 // ローカルフォルダ連携では古いキャッシュを避けるためService Workerを使用しません。
 
+// 保存設定または端末特性に合わせて初回レイアウトを決めます。
+setMobileLayout(getInitialMobileLayout(), false);
+// お気に入りアイコンの初回ヒントを設定します。
+syncFavoriteHint();
 // 自動保存状態を復元します。
 restoreAutosave();
 // 初期ツールを設定します。
