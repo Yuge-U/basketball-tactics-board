@@ -376,8 +376,8 @@ function createInitialState() {
     movementSpeed: 1,
     playbackSpeed: 1,
     showMovementLines: true,
-    focusShowPlayButton: true,
-    focusShowSteps: true,
+    focusShowPlayButton: false,
+    focusShowSteps: false,
     activeStepId: firstStep.id,
     steps: [firstStep]
   };
@@ -607,8 +607,8 @@ function migrateSnapshot(snapshot) {
 function applySnapshot(snapshot) {
   // 最大表示中の一時的な表示切替は履歴や保存データとは分離します。
   const focusVisibility = {
-    play: isFocusMode ? state.focusShowPlayButton : true,
-    steps: isFocusMode ? state.focusShowSteps : true
+    play: isFocusMode ? state.focusShowPlayButton : false,
+    steps: isFocusMode ? state.focusShowSteps : false
   };
   // 旧版データを含めて現行形式へ変換します。
   const migrated = migrateSnapshot(snapshot);
@@ -2512,7 +2512,9 @@ function updatePlayButtonLabels(label) {
   // 通常表示の再生ボタンを更新します。
   document.getElementById("playStepsButton").textContent = label;
   // 最大表示では短い文言へ置き換えます。
-  focusPlayButton.textContent = label.includes("停止") ? "■ 停止" : "▶ 再生";
+  focusPlayButton.textContent = label.includes("停止") ? "■" : "▶";
+  focusPlayButton.setAttribute("aria-label", label.includes("停止") ? "停止" : "再生");
+  focusPlayButton.title = label.includes("停止") ? "停止" : "再生";
 }
 
 // 最大表示中の再生ボタンとSTEP一覧の表示状態を同期します。
@@ -2578,9 +2580,9 @@ function setFocusMode(enabled) {
   document.body.classList.toggle("board-focus", isFocusMode);
   // 最大表示へ入る場合を処理します。
   if (isFocusMode) {
-    // 最大表示へ入るたび、再生ボタンとSTEP一覧を標準表示へ戻します。
-    state.focusShowPlayButton = true;
-    state.focusShowSteps = true;
+    // 最大表示へ入るたび、再生ボタンとSTEP一覧を標準の非表示へ戻します。
+    state.focusShowPlayButton = false;
+    state.focusShowSteps = false;
     // ブラウザーが対応していれば全画面表示も試します。
     document.documentElement.requestFullscreen?.().catch(() => undefined);
   } else if (document.fullscreenElement) {
@@ -3723,6 +3725,8 @@ function resetBoard() {
   playNameInput.value = state.playName;
   // 画面を同期します。
   syncInterface();
+  // 全面から半面へ戻った場合もCanvasの比率と変換情報を即時再計算します。
+  resizeCanvas();
   // 結果を通知します。
   showToast("初期状態へ戻しました");
 }

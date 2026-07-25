@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v25-fullscreen-step-court";
+const CACHE_NAME = "basketball-tactics-board-v26-reset-focus-icons";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

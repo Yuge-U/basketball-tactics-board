@@ -574,24 +574,6 @@ button:disabled {
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
 }
 
-/* ショートカット説明の文字です。 */
-.shortcuts p {
-  margin: 8px 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-/* キーボードキーの見た目です。 */
-kbd {
-  border: 1px solid var(--line);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  padding: 1px 5px;
-  color: #374151;
-  background: #f9fafb;
-  font-size: 11px;
-}
-
 /* 保存作戦ダイアログです。 */
 .library-dialog {
   width: min(680px, calc(100vw - 28px));
@@ -766,10 +748,6 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .shortcuts {
-    display: none;
-  }
-
   .canvas-shell {
     min-height: 0;
   }
@@ -940,28 +918,40 @@ kbd {
 /* 最大表示時の操作ボタン領域です。 */
 .focus-controls {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 12px;
+  right: 12px;
   z-index: 12;
   display: none;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* 最大表示時の操作ボタンです。 */
+/* 最大表示時の操作を小さな薄いアイコンで表示します。 */
 .focus-button {
-  min-height: 44px;
-  border: 1px solid rgba(255, 255, 255, 0.52);
-  border-radius: 12px;
-  padding: 9px 14px;
-  color: #ffffff;
-  background: rgba(17, 24, 39, 0.82);
-  backdrop-filter: blur(8px);
-  font-weight: 800;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(17, 24, 39, 0.34);
+  opacity: 0.38;
+  backdrop-filter: blur(7px);
+  font-size: 15px;
+  font-weight: 900;
+  transition: opacity 0.15s ease, background 0.15s ease;
 }
 
-/* 最大表示時の主要操作です。 */
+/* 再生も他の最大表示操作と同じ薄いアイコンにします。 */
 .focus-button.primary {
-  background: rgba(29, 78, 216, 0.9);
+  background: rgba(29, 78, 216, 0.36);
+}
+
+.focus-button:hover,
+.focus-button:focus-visible {
+  opacity: 0.92;
+  background: rgba(17, 24, 39, 0.76);
 }
 
 /* 非表示指定を優先します。 */

@@ -1,1 +1,1 @@
-Basketball Tactics Board v25 - Fullscreen display toggles / compact player controls / throw-in court margin
+Basketball Tactics Board v26 - Reset canvas fix / hidden fullscreen overlays / compact focus icons
