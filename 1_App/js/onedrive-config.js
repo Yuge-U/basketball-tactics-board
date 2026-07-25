@@ -6,6 +6,6 @@
  * 全端末ですぐ使えるようにする場合は、公開前にこのファイルへ設定してください。
  */
 window.OneDriveConfig = {
-  clientId: "YOUR_MICROSOFT_ENTRA_CLIENT_ID",
+clientId: "b75b499d-2b47-42ed-9e10-41cd76dbc6c5",
   authority: "https://login.microsoftonline.com/consumers"
 };
