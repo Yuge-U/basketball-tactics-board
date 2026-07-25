@@ -707,7 +707,7 @@ kbd {
 }
 
 /* 中型画面では右パネルを下段へ移動します。 */
-@media (max-width: 1180px) {
+@media (max-width: 820px) {
   .workspace {
     grid-template-columns: 82px minmax(0, 1fr);
   }
@@ -1414,6 +1414,205 @@ body.board-focus .focus-controls {
   border-color: #6ee7b7;
   color: #ecfdf5;
   background: #047857;
+}
+
+/* 画面上部を圧縮し、コートへ使える高さをできるだけ確保します。 */
+.topbar {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(500px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+}
+
+.brand-area {
+  gap: 8px;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.brand-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrow {
+  display: none;
+}
+
+.play-name {
+  width: 100%;
+  padding: 3px 0;
+  font-size: clamp(17px, 1.3vw, 21px);
+}
+
+.play-meta-inline {
+  min-width: 0;
+  flex-wrap: nowrap;
+  gap: 6px;
+  margin-top: 0;
+}
+
+.meta-select,
+.meta-input {
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+
+.play-meta-inline .meta-select {
+  width: 126px;
+  min-width: 110px;
+}
+
+.play-meta-inline .meta-input {
+  min-width: 100px;
+  flex: 1;
+}
+
+.favorite-toggle {
+  font-size: 12px;
+}
+
+.top-actions {
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: visible;
+}
+
+.top-actions .button {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* 横幅が足りない場合だけ操作ボタンを2段目へ移します。 */
+@media (max-width: 1180px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding: 7px 10px;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+}
+
+/* デスクトップでは長い設定パネルだけを内部スクロールへ切り替えます。 */
+@media (min-width: 821px) {
+  .detail-panel {
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+  }
+}
+
+@media (min-width: 821px) and (max-width: 1180px) {
+  .detail-panel {
+    max-height: calc(100dvh - 114px);
+  }
+}
+
+/* 横長かつ高さが低い画面では、周辺操作もコンパクトにします。 */
+@media (min-width: 821px) and (max-height: 900px) {
+  .workspace {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .tool-panel {
+    gap: 4px;
+    max-height: calc(100dvh - 96px);
+    padding: 6px;
+    border-radius: 13px;
+  }
+
+  .tool-button {
+    min-height: 50px;
+    gap: 2px;
+    font-size: 11px;
+  }
+
+  .tool-icon {
+    font-size: 20px;
+  }
+
+  .board-column,
+  .detail-panel {
+    gap: 7px;
+  }
+
+  .board-controls {
+    gap: 6px;
+  }
+
+  .panel-card {
+    padding: 10px;
+    border-radius: 13px;
+  }
+
+  .panel-card h2 {
+    margin-bottom: 8px;
+  }
+
+  .step-chip {
+    min-height: 36px;
+    padding: 5px 10px;
+  }
+}
+
+/* タブレット以下でもヘッダー内の項目を縦へ伸ばしすぎないようにします。 */
+@media (max-width: 820px) {
+  .topbar {
+    display: grid;
+    align-items: center;
+  }
+
+  .brand-copy {
+    grid-template-columns: minmax(130px, 190px) minmax(0, 1fr);
+  }
+
+  .play-name {
+    width: 100%;
+  }
+
+  .top-actions {
+    display: flex;
+  }
+
+  .play-meta-inline {
+    display: flex;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand-copy {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .play-meta-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  }
+
+  .favorite-toggle {
+    grid-column: 1 / -1;
+  }
 }
 
 /* OneDrive設定ダイアログの内容です。 */
