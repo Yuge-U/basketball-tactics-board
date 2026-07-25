@@ -391,6 +391,7 @@ button:disabled {
   padding: 7px 12px;
   color: var(--muted);
   background: var(--surface);
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -407,6 +408,13 @@ button:disabled {
   display: flex;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.step-actions .button {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 /* 右側パネルを縦に並べます。 */
@@ -466,7 +474,7 @@ button:disabled {
 /* 動作順の1行を整えます。 */
 .action-order-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px;
+  grid-template-columns: minmax(0, 1fr) 52px 32px;
   align-items: center;
   gap: 8px;
   padding: 7px 8px;
@@ -504,7 +512,7 @@ button:disabled {
 
 /* 再生順の選択欄です。 */
 .action-order-select {
-  width: 58px;
+  width: 52px;
   min-height: 34px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -512,6 +520,20 @@ button:disabled {
   background: #ffffff;
   font-weight: 800;
   text-align: center;
+}
+
+/* 動作順から個別の動作を削除する小型ボタンです。 */
+.action-order-delete {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #b91c1c;
+  background: #fff7f7;
+  font-size: 18px;
+  font-weight: 800;
 }
 
 /* 動作線がない場合の案内です。 */
@@ -523,47 +545,6 @@ button:disabled {
   background: #f3f4f6;
   font-size: 12px;
   line-height: 1.5;
-}
-
-/* 凡例を横並びにします。 */
-.legend-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 9px 0;
-  color: #374151;
-  font-size: 13px;
-}
-
-/* 凡例線の共通領域です。 */
-.legend-line {
-  width: 38px;
-  display: inline-block;
-  flex-shrink: 0;
-  color: #1f2937;
-  text-align: center;
-  font-size: 22px;
-  font-weight: 800;
-}
-
-/* 実線の凡例です。 */
-.legend-line.solid {
-  border-top: 3px solid #1f2937;
-}
-
-/* 点線の凡例です。 */
-.legend-line.dashed {
-  border-top: 3px dashed #1f2937;
-}
-
-/* スクリーンの凡例です。 */
-.legend-line.screen {
-  font-size: 26px;
-}
-
-/* 自由線の凡例です。 */
-.legend-line.free {
-  font-size: 22px;
 }
 
 /* メモ見出しを太くします。 */
@@ -1023,6 +1004,46 @@ kbd {
   background: #ffffff;
 }
 
+/* 最大表示中の再生ボタンとSTEP一覧を開閉する薄いアイコンです。 */
+.focus-visibility-controls {
+  display: none;
+}
+
+body.board-focus .focus-visibility-controls {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 19;
+  display: flex;
+  gap: 7px;
+}
+
+.focus-visibility-button {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(17, 24, 39, 0.35);
+  opacity: 0.35;
+  backdrop-filter: blur(7px);
+  font-size: 17px;
+  font-weight: 900;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.focus-visibility-button:hover,
+.focus-visibility-button:focus-visible,
+.focus-visibility-button.active {
+  opacity: 0.84;
+}
+
+.focus-visibility-button:not(.active) {
+  text-decoration: line-through;
+}
+
 /* コート最大表示中は周辺UIを隠します。 */
 body.board-focus {
   overflow: hidden;
@@ -1098,12 +1119,80 @@ body.board-focus .canvas-hint {
   max-width: 100%;
 }
 
-/* 選手番号管理カードの説明文を整えます。 */
-.player-manager-header p {
-  margin: 4px 0 0;
-  color: var(--muted);
+/* 選手管理の見出しと全番号ボタンを横並びにします。 */
+.player-manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.player-manager-header h2 {
+  margin: 0;
+}
+
+.number-details-toggle {
+  min-height: 32px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
+.number-details-toggle.active {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+/* 標準表示の人数増減をコンパクトにまとめます。 */
+.player-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.player-count-label {
   font-size: 12px;
-  line-height: 1.5;
+  font-weight: 800;
+}
+
+.player-count-control {
+  display: grid;
+  grid-template-columns: 34px 38px 34px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.player-count-control button {
+  height: 32px;
+  border: 0;
+  color: #1d4ed8;
+  background: transparent;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.player-count-row.defense .player-count-control button {
+  color: #b91c1c;
+}
+
+.player-count-control output {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  border-inline: 1px solid #e5e7eb;
+  color: var(--text);
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.player-number-details.hidden {
+  display: none;
 }
 
 /* オフェンスとディフェンスの番号領域を縦に並べます。 */
@@ -1377,13 +1466,6 @@ body.board-focus .focus-editor-toggle.open {
   color: #111827;
   background: rgba(255, 255, 255, 0.9);
   font-size: 11px;
-}
-
-/* 凡例内のコーン記号を表示します。 */
-.legend-line.cone {
-  color: #dc2626;
-  font-size: 20px;
-  font-weight: 900;
 }
 
 /* 最大表示中の赤コーン追加ボタンです。 */

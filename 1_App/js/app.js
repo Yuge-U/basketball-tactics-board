@@ -2,6 +2,8 @@
 const HALF_COURT = { width: 1050, height: 980 };
 // 全面コートをFIBA寸法比の28m×15mで扱う論理サイズを定義します。
 const FULL_COURT = { width: 1120, height: 600 };
+// スローイン配置に使うコート外周の論理余白を定義します。
+const COURT_OUTER_MARGIN = 76;
 // v8の半面コート論理サイズを移行処理用に定義します。
 const V8_HALF_COURT = { width: 1280, height: 760 };
 // v6までの半面コート論理サイズを移行処理用に定義します。
@@ -255,16 +257,16 @@ let lastLibraryItems = [];
 const importJsonInput = document.getElementById("importJsonInput");
 // 移動線表示切替を取得します。
 const showMovementLinesToggle = document.getElementById("showMovementLinesToggle");
-// 最大表示時の再生ボタン切替を取得します。
-const focusPlayToggle = document.getElementById("focusPlayToggle");
-// 最大表示時のSTEP一覧切替を取得します。
-const focusStepsToggle = document.getElementById("focusStepsToggle");
 // 最大表示用の操作領域を取得します。
 const focusControls = document.getElementById("focusControls");
 // 最大表示用の再生ボタンを取得します。
 const focusPlayButton = document.getElementById("focusPlayButton");
 // 最大表示用のSTEP一覧を取得します。
 const focusStepList = document.getElementById("focusStepList");
+// 最大表示中の再生ボタン表示切替を取得します。
+const focusPlayVisibilityButton = document.getElementById("focusPlayVisibilityButton");
+// 最大表示中のSTEP一覧表示切替を取得します。
+const focusStepsVisibilityButton = document.getElementById("focusStepsVisibilityButton");
 // 最大表示中の編集パネルを取得します。
 const focusEditorPanel = document.getElementById("focusEditorPanel");
 // 最大表示中の編集パネル開閉ボタンを取得します。
@@ -277,6 +279,12 @@ const focusRedoButton = document.getElementById("focusRedoButton");
 const offenseNumberGrid = document.getElementById("offenseNumberGrid");
 // ディフェンス番号ボタンの配置先を取得します。
 const defenseNumberGrid = document.getElementById("defenseNumberGrid");
+// 選手人数の表示欄を取得します。
+const offensePlayerCount = document.getElementById("offensePlayerCount");
+const defensePlayerCount = document.getElementById("defensePlayerCount");
+// 全番号の開閉要素を取得します。
+const playerNumberDetails = document.getElementById("playerNumberDetails");
+const playerNumberDetailsToggle = document.getElementById("playerNumberDetailsToggle");
 // 現在STEPの動作順一覧を取得します。
 const actionOrderList = document.getElementById("actionOrderList");
 // 動作順を初期値へ戻すボタンを取得します。
@@ -342,6 +350,8 @@ let viewport = { scale: 1, offsetX: 0, offsetY: 0, cssWidth: 1, cssHeight: 1 };
 let isFocusMode = false;
 // 最大表示中の編集パネルを開いているか保持します。
 let isFocusEditorOpen = false;
+// 全番号選択欄を開いているか保持します。
+let playerNumberDetailsVisible = false;
 // コマ送り再生の現在位置を保持します。
 let framePlayback = null;
 
@@ -408,6 +418,15 @@ function getCourtSize() {
   return HALF_COURT;
 }
 
+// コート本体にスローイン用外周を加えたCanvas論理サイズを返します。
+function getCourtDisplaySize() {
+  const size = getCourtSize();
+  return {
+    width: size.width + COURT_OUTER_MARGIN * 2,
+    height: size.height + COURT_OUTER_MARGIN * 2
+  };
+}
+
 // 現在選択中のSTEPを返します。
 function getActiveStep() {
   // IDが一致するSTEPを探して返します。
@@ -436,10 +455,6 @@ function createSnapshot() {
     playbackSpeed: state.playbackSpeed,
     // 移動線の表示設定を保存します。
     showMovementLines: state.showMovementLines,
-    // 最大表示時の再生ボタン設定を保存します。
-    focusShowPlayButton: state.focusShowPlayButton,
-    // 最大表示時のSTEP一覧設定を保存します。
-    focusShowSteps: state.focusShowSteps,
     // 選択中STEPを保存します。
     activeStepId: state.activeStepId,
     // 全STEPを保存します。
@@ -577,10 +592,6 @@ function migrateSnapshot(snapshot) {
   migrated.playbackSpeed = normalizeSpeed(migrated.playbackSpeed);
   // 移動線表示設定を補います。
   migrated.showMovementLines = migrated.showMovementLines !== false;
-  // 最大表示時の再生ボタン設定を補います。
-  migrated.focusShowPlayButton = migrated.focusShowPlayButton !== false;
-  // 最大表示時のSTEP一覧設定を補います。
-  migrated.focusShowSteps = migrated.focusShowSteps !== false;
   // ライブラリ管理情報を補います。
   migrated.libraryMeta = migrated.libraryMeta ?? { folder: "Shared", tags: [], favorite: false };
   migrated.libraryMeta.folder = String(migrated.libraryMeta.folder || "Shared");
@@ -594,6 +605,11 @@ function migrateSnapshot(snapshot) {
 
 // 履歴スナップショットを状態へ適用します。
 function applySnapshot(snapshot) {
+  // 最大表示中の一時的な表示切替は履歴や保存データとは分離します。
+  const focusVisibility = {
+    play: isFocusMode ? state.focusShowPlayButton : true,
+    steps: isFocusMode ? state.focusShowSteps : true
+  };
   // 旧版データを含めて現行形式へ変換します。
   const migrated = migrateSnapshot(snapshot);
   // 作戦名を復元します。
@@ -615,10 +631,9 @@ function applySnapshot(snapshot) {
   state.playbackSpeed = normalizeSpeed(migrated.playbackSpeed);
   // 移動線の表示設定を復元します。
   state.showMovementLines = migrated.showMovementLines !== false;
-  // 最大表示時の再生ボタン設定を復元します。
-  state.focusShowPlayButton = migrated.focusShowPlayButton !== false;
-  // 最大表示時のSTEP一覧設定を復元します。
-  state.focusShowSteps = migrated.focusShowSteps !== false;
+  // 最大表示の再生ボタンとSTEP一覧は標準表示とし、最大表示中だけ一時切替を維持します。
+  state.focusShowPlayButton = focusVisibility.play;
+  state.focusShowSteps = focusVisibility.steps;
   // STEPを復元します。
   state.steps = migrated.steps ?? [];
   // 各STEPに不足している配列を補います。
@@ -701,7 +716,7 @@ function redo() {
 // Canvasの表示サイズを調整します。
 function resizeCanvas() {
   // 現在のコートサイズを取得します。
-  const size = getCourtSize();
+  const size = getCourtDisplaySize();
   // コートの縦横比を計算します。
   const courtRatio = size.width / size.height;
   // 通常編集画面ではコートの実寸比率を崩さず、画面の高さへ収めます。
@@ -762,19 +777,19 @@ function pointerToCourt(event) {
   const localY = event.clientY - rect.top;
   // コート座標へ変換して返します。
   return {
-    x: (localX - viewport.offsetX) / viewport.scale,
-    y: (localY - viewport.offsetY) / viewport.scale
+    x: (localX - viewport.offsetX) / viewport.scale - COURT_OUTER_MARGIN,
+    y: (localY - viewport.offsetY) / viewport.scale - COURT_OUTER_MARGIN
   };
 }
 
-// 座標をコート内へ収めます。
+// 座標をスローイン用外周を含む範囲内へ収めます。
 function clampPoint(point, margin = 0) {
   // 現在のコートサイズを取得します。
   const size = getCourtSize();
   // 範囲内へ収めた座標を返します。
   return {
-    x: Math.max(margin, Math.min(size.width - margin, point.x)),
-    y: Math.max(margin, Math.min(size.height - margin, point.y))
+    x: Math.max(-COURT_OUTER_MARGIN + margin, Math.min(size.width + COURT_OUTER_MARGIN - margin, point.x)),
+    y: Math.max(-COURT_OUTER_MARGIN + margin, Math.min(size.height + COURT_OUTER_MARGIN - margin, point.y))
   };
 }
 
@@ -796,6 +811,8 @@ function render() {
   context.translate(viewport.offsetX, viewport.offsetY);
   // コート倍率を適用します。
   context.scale(viewport.scale, viewport.scale);
+  // 外周余白の内側へ従来寸法のコート本体を配置します。
+  context.translate(COURT_OUTER_MARGIN, COURT_OUTER_MARGIN);
   // コートを描画します。
   drawCourt(context);
   // 現在のSTEPを取得します。
@@ -2495,7 +2512,19 @@ function updatePlayButtonLabels(label) {
   // 通常表示の再生ボタンを更新します。
   document.getElementById("playStepsButton").textContent = label;
   // 最大表示では短い文言へ置き換えます。
-  focusPlayButton.textContent = label.includes("停止") ? "■ 停止" : "▶ 連続";
+  focusPlayButton.textContent = label.includes("停止") ? "■ 停止" : "▶ 再生";
+}
+
+// 最大表示中の再生ボタンとSTEP一覧の表示状態を同期します。
+function syncFocusVisibility() {
+  focusPlayButton.classList.toggle("hidden", !state.focusShowPlayButton);
+  focusStepList.classList.toggle("hidden", !state.focusShowSteps);
+  focusPlayVisibilityButton.classList.toggle("active", state.focusShowPlayButton);
+  focusPlayVisibilityButton.setAttribute("aria-pressed", String(state.focusShowPlayButton));
+  focusPlayVisibilityButton.title = state.focusShowPlayButton ? "再生ボタンを隠す" : "再生ボタンを表示";
+  focusStepsVisibilityButton.classList.toggle("active", state.focusShowSteps);
+  focusStepsVisibilityButton.setAttribute("aria-pressed", String(state.focusShowSteps));
+  focusStepsVisibilityButton.title = state.focusShowSteps ? "STEP一覧を隠す" : "STEP一覧を表示";
 }
 
 // 最大表示中のSTEP一覧を描画します。
@@ -2519,8 +2548,8 @@ function renderFocusStepList() {
     // 一覧へ追加します。
     focusStepList.appendChild(button);
   });
-  // 設定に応じてSTEP一覧を表示します。
-  focusStepList.classList.toggle("hidden", !state.focusShowSteps);
+  // 現在の最大表示用表示状態を反映します。
+  syncFocusVisibility();
 }
 
 // 最大表示中の編集ツールパネルを開閉します。
@@ -2547,18 +2576,19 @@ function setFocusMode(enabled) {
   setFocusEditorOpen(false);
   // 画面全体へ最大表示クラスを切り替えます。
   document.body.classList.toggle("board-focus", isFocusMode);
-  // 再生ボタンの表示設定を反映します。
-  focusPlayButton.classList.toggle("hidden", !state.focusShowPlayButton);
-  // STEP一覧の表示設定を反映します。
-  focusStepList.classList.toggle("hidden", !state.focusShowSteps);
   // 最大表示へ入る場合を処理します。
   if (isFocusMode) {
+    // 最大表示へ入るたび、再生ボタンとSTEP一覧を標準表示へ戻します。
+    state.focusShowPlayButton = true;
+    state.focusShowSteps = true;
     // ブラウザーが対応していれば全画面表示も試します。
     document.documentElement.requestFullscreen?.().catch(() => undefined);
   } else if (document.fullscreenElement) {
     // 全画面表示中なら解除します。
     document.exitFullscreen?.().catch(() => undefined);
   }
+  // 薄いアイコンを含めて表示状態を同期します。
+  syncFocusVisibility();
   // レイアウト反映後にCanvasサイズを再計算します。
   window.setTimeout(resizeCanvas, 40);
 }
@@ -2748,6 +2778,40 @@ function togglePlayerNumber(side, number) {
   showToast(`${side === "offense" ? "オフェンス" : "ディフェンス"}${number}番を${existing ? "削除" : "追加"}しました`);
 }
 
+// 指定側の人数を1人ずつ簡単に増減します。
+function adjustPlayerCount(side, change) {
+  const players = getActiveStep().players.filter((player) => player.side === side);
+  if (change > 0) {
+    const usedNumbers = new Set(players.map((player) => String(player.label)));
+    const preferredNumbers = [...Array.from({ length: 18 }, (_, index) => index + 1), 0];
+    const nextNumber = preferredNumbers.find((number) => !usedNumbers.has(String(number)));
+    if (nextNumber === undefined) {
+      showToast("追加できる番号は0〜18です");
+      return;
+    }
+    togglePlayerNumber(side, nextNumber);
+    return;
+  }
+  if (players.length === 0) {
+    showToast(`${side === "offense" ? "オフェンス" : "ディフェンス"}は0人です`);
+    return;
+  }
+  const target = [...players].sort((a, b) => Number(b.label) - Number(a.label))[0];
+  togglePlayerNumber(side, target.label);
+}
+
+// 全番号選択欄を必要な時だけ開閉します。
+function setPlayerNumberDetailsVisible(visible) {
+  playerNumberDetailsVisible = Boolean(visible);
+  playerNumberDetails.classList.toggle("hidden", !playerNumberDetailsVisible);
+  playerNumberDetailsToggle.classList.toggle("active", playerNumberDetailsVisible);
+  playerNumberDetailsToggle.setAttribute("aria-expanded", String(playerNumberDetailsVisible));
+  playerNumberDetailsToggle.textContent = playerNumberDetailsVisible ? "123 閉じる" : "123 全番号";
+  playerNumberDetailsToggle.title = playerNumberDetailsVisible
+    ? "全番号を閉じる"
+    : "全番号を表示。番号を押すと現在STEPへ追加・削除できます";
+}
+
 // オフェンスとディフェンスの0番から18番ボタンを描画します。
 function renderPlayerNumberGrids() {
   // 現在STEPを取得します。
@@ -2778,6 +2842,11 @@ function renderPlayerNumberGrids() {
       grid.appendChild(button);
     }
   });
+  // 通常表示する簡易人数へ現在STEPの人数を反映します。
+  offensePlayerCount.textContent = String(step.players.filter((player) => player.side === "offense").length);
+  defensePlayerCount.textContent = String(step.players.filter((player) => player.side === "defense").length);
+  // 全番号欄の開閉状態を維持します。
+  setPlayerNumberDetailsVisible(playerNumberDetailsVisible);
 }
 
 // 動作線の種類を一覧表示用の短い名前へ変換します。
@@ -2826,7 +2895,7 @@ function renderActionOrderList() {
     // 見た目用クラスを設定します。
     empty.className = "action-order-empty";
     // 案内文を設定します。
-    empty.textContent = "動作線を描くと、ここで再生順を設定できます。";
+    empty.textContent = "動作なし";
     // 一覧へ追加します。
     actionOrderList.appendChild(empty);
     // 処理を終了します。
@@ -2900,13 +2969,33 @@ function renderActionOrderList() {
       // 同じ番号が同時再生になることを通知します。
       showToast(`再生順を${nextOrder}に変更しました。同じ番号の移動・スクリーンは同時に動きます`);
     });
+    // 個別動作を削除するボタンを作ります。
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "action-order-delete";
+    deleteButton.textContent = "×";
+    deleteButton.title = `${label.textContent}を削除`;
+    deleteButton.setAttribute("aria-label", `${label.textContent}を削除`);
+    deleteButton.addEventListener("click", () => deleteActionLine(line.id));
     // 行へ情報領域を追加します。
     row.appendChild(info);
     // 行へ順番選択欄を追加します。
     row.appendChild(select);
+    // 行へ個別削除ボタンを追加します。
+    row.appendChild(deleteButton);
     // 一覧へ行を追加します。
     actionOrderList.appendChild(row);
   });
+}
+
+// 動作順欄から指定した動作線だけを削除します。
+function deleteActionLine(lineId) {
+  clearPlaybackPreview();
+  commitMutation(() => {
+    const step = getActiveStep();
+    step.lines = step.lines.filter((line) => line.id !== lineId);
+  });
+  showToast("動作を削除しました");
 }
 
 // 現在STEPの動作順を初期設定へ戻します。
@@ -3548,7 +3637,7 @@ function finishPlaybackAtEnd() {
   // フレームIDを空にします。
   playbackFrame = null;
   // 再生ボタン表示を戻します。
-  updatePlayButtonLabels("▶ 連続再生");
+  updatePlayButtonLabels("▶ 再生");
   // 最終位置を保持した状態で再描画します。
   render();
 }
@@ -3591,7 +3680,7 @@ function stopPlayback(showMessage = true) {
   // コマ送り位置を解除します。
   framePlayback = null;
   // 再生ボタン表示を戻します。
-  updatePlayButtonLabels("▶ 連続再生");
+  updatePlayButtonLabels("▶ 再生");
   // 通常の保存位置で再描画します。
   render();
   // 手動停止時だけ通知します。
@@ -4325,12 +4414,8 @@ function syncInterface(save = true) {
   renderActionOrderList();
   // 移動線表示スイッチを同期します。
   showMovementLinesToggle.checked = state.showMovementLines;
-  // 最大表示時の再生ボタン設定を同期します。
-  focusPlayToggle.checked = state.focusShowPlayButton;
-  // 最大表示時のSTEP一覧設定を同期します。
-  focusStepsToggle.checked = state.focusShowSteps;
-  // 最大表示の再生ボタンを設定に応じて切り替えます。
-  focusPlayButton.classList.toggle("hidden", !state.focusShowPlayButton);
+  // 最大表示中の表示切替を薄いアイコンを含めて同期します。
+  syncFocusVisibility();
   // 色ボタンを選択状態へ同期します。
   setLineColor(state.activeLineColor);
   // 移動速度設定を同期します。
@@ -4441,6 +4526,18 @@ document.querySelectorAll("[data-player-size]").forEach((button) => {
   button.addEventListener("click", () => setPlayerSize(button.dataset.playerSize));
 });
 
+// 簡易人数の増減ボタンへイベントを登録します。
+document.querySelectorAll("[data-player-count-change]").forEach((button) => {
+  button.addEventListener("click", () => {
+    adjustPlayerCount(button.dataset.playerCountSide, Number(button.dataset.playerCountChange));
+  });
+});
+
+// 全番号選択欄の開閉ボタンを登録します。
+playerNumberDetailsToggle.addEventListener("click", () => {
+  setPlayerNumberDetailsVisible(!playerNumberDetailsVisible);
+});
+
 // コーン追加ボタンへイベントを登録します。
 document.querySelectorAll("[data-add-cone]").forEach((button) => {
   // クリック時に指定色のコーンを追加します。
@@ -4502,6 +4599,16 @@ focusPlayButton.addEventListener("click", playSteps);
 focusPreviousFrameButton.addEventListener("click", stepPlaybackBackward);
 // 最大表示用の次へボタンを登録します。
 focusNextFrameButton.addEventListener("click", stepPlaybackForward);
+// 最大表示中の再生ボタン表示切替を登録します。
+focusPlayVisibilityButton.addEventListener("click", () => {
+  state.focusShowPlayButton = !state.focusShowPlayButton;
+  syncFocusVisibility();
+});
+// 最大表示中のSTEP一覧表示切替を登録します。
+focusStepsVisibilityButton.addEventListener("click", () => {
+  state.focusShowSteps = !state.focusShowSteps;
+  syncFocusVisibility();
+});
 // 最大表示中の編集ツール開閉ボタンを登録します。
 focusEditorToggleButton.addEventListener("click", () => setFocusEditorOpen(!isFocusEditorOpen));
 // 最大表示中の元に戻すボタンを登録します。
@@ -4612,26 +4719,6 @@ showMovementLinesToggle.addEventListener("change", () => {
   state.showMovementLines = showMovementLinesToggle.checked;
   // 画面を再描画します。
   render();
-  // 設定を自動保存します。
-  autosave();
-});
-
-// 最大表示時の再生ボタン設定を反映します。
-focusPlayToggle.addEventListener("change", () => {
-  // 設定値を状態へ保存します。
-  state.focusShowPlayButton = focusPlayToggle.checked;
-  // 最大表示のボタンを切り替えます。
-  focusPlayButton.classList.toggle("hidden", !state.focusShowPlayButton);
-  // 設定を自動保存します。
-  autosave();
-});
-
-// 最大表示時のSTEP一覧設定を反映します。
-focusStepsToggle.addEventListener("change", () => {
-  // 設定値を状態へ保存します。
-  state.focusShowSteps = focusStepsToggle.checked;
-  // 最大表示のSTEP一覧を切り替えます。
-  focusStepList.classList.toggle("hidden", !state.focusShowSteps);
   // 設定を自動保存します。
   autosave();
 });
