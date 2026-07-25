@@ -4242,6 +4242,40 @@ function autosave() {
   localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(createSnapshot()));
 }
 
+// 旧版の未編集初期配置が自動保存されているか確認します。
+function isLegacyDefaultAutosave(snapshot) {
+  // v23以前の半面・1STEP・新規作戦だけを移行対象にします。
+  if (Number(snapshot?.schemaVersion ?? 1) > 11 || snapshot?.playName !== "新しい作戦" || snapshot?.courtMode !== "half" || snapshot?.steps?.length !== 1) {
+    return false;
+  }
+  // 初期STEP以外の編集内容がある場合は利用者の作戦として維持します。
+  const step = snapshot.steps[0];
+  if (String(step?.note ?? "").trim() || (step?.lines?.length ?? 0) > 0 || (step?.cones?.length ?? 0) > 0 || (step?.texts?.length ?? 0) > 0) {
+    return false;
+  }
+  // v22までの初期選手配置を定義します。
+  const expectedPlayers = [
+    ["o1", "offense", 0.5, 0.78],
+    ["o2", "offense", 0.24, 0.65],
+    ["o3", "offense", 0.76, 0.65],
+    ["o4", "offense", 0.35, 0.36],
+    ["o5", "offense", 0.65, 0.36],
+    ["d1", "defense", 0.5, 0.66],
+    ["d2", "defense", 0.27, 0.54],
+    ["d3", "defense", 0.73, 0.54],
+    ["d4", "defense", 0.39, 0.27],
+    ["d5", "defense", 0.61, 0.27]
+  ];
+  // 選手数と各選手のID・陣営・初期座標がすべて一致する場合だけ初期配置と判定します。
+  const players = Array.isArray(step.players) ? step.players : [];
+  return players.length === expectedPlayers.length && expectedPlayers.every(([id, side, xRatio, yRatio]) => players.some((player) => (
+    player.id === id
+    && player.side === side
+    && Math.abs(Number(player.x) - HALF_COURT.width * xRatio) < 1
+    && Math.abs(Number(player.y) - HALF_COURT.height * yRatio) < 1
+  )));
+}
+
 // 自動保存状態を復元します。
 function restoreAutosave() {
   // 自動保存文字列を取得します。
@@ -4254,6 +4288,10 @@ function restoreAutosave() {
   try {
     // スナップショットを取得します。
     const snapshot = JSON.parse(raw);
+    // v22までの未編集初期配置なら、新しい初期仕様に合わせてディフェンスだけを外します。
+    if (isLegacyDefaultAutosave(snapshot)) {
+      snapshot.steps[0].players = snapshot.steps[0].players.filter((player) => player.side !== "defense");
+    }
     // STEPデータがある場合だけ適用します。
     if (Array.isArray(snapshot.steps) && snapshot.steps.length > 0) {
       // 状態へ適用します。
