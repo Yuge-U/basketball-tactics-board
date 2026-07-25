@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v30-new-play-default";
+const CACHE_NAME = "basketball-tactics-board-v31-safe-save-confirmation";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

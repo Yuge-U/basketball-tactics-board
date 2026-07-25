@@ -3981,6 +3981,45 @@ function createExportPayload() {
   };
 }
 
+// 初期名のまま保存して既存作戦を上書きしないようにします。
+function validatePlayNameForSave(name) {
+  if (String(name || "").trim().toLowerCase() !== "new play") {
+    return true;
+  }
+  window.alert("「new play」のままでは保存できません。\n\n上部の作戦名を変更してから、もう一度保存してください。");
+  playNameInput.focus();
+  playNameInput.select();
+  return false;
+}
+
+// 保存済み作戦が今回の保存先と同じフォルダ・同じ名前か確認します。
+function isSameLibraryTarget(item, name, folder) {
+  const samePlayName = String(item?.name || "") === name;
+  if (item?.source === "local" || !item?.relativePath) {
+    return samePlayName;
+  }
+  const normalizedFolder = String(folder || "Shared").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const pathParts = String(item.relativePath).replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").split("/");
+  const existingFileName = pathParts.pop();
+  const targetFileName = `${String(name || "")
+    .replace(/["*:<>?\/\\|]/g, "_")
+    .replace(/[.\s]+$/g, "")
+    .trim()
+    .slice(0, 120) || "名称未設定の作戦"}.json`;
+  return pathParts.join("/") === normalizedFolder && (samePlayName || existingFileName === targetFileName);
+}
+
+// 同じ保存先がある場合は、利用者が明示的に了承したときだけ上書きします。
+function confirmLibraryOverwrite(items, name, folder) {
+  const existing = (items || []).find((item) => isSameLibraryTarget(item, name, folder));
+  if (!existing) {
+    return true;
+  }
+  return window.confirm(
+    `「${name}」は ${folder || "Shared"} に既に保存されています。\n\n上書きしますか？\n\n新規保存する場合は「キャンセル」を押し、作戦名を変更してください。`
+  );
+}
+
 // フォルダAPIへ通信し、JSON応答を取得します。
 async function requestFolderApi(path, options = {}) {
   // APIへ通信します。
@@ -4008,6 +4047,10 @@ async function savePlayToLibrary() {
     tags: String(playTagsInput?.value || "").split(",").map((tag) => tag.trim()).filter(Boolean),
     favorite: Boolean(playFavoriteInput?.checked)
   };
+  // 初期名のままでは保存を開始しません。
+  if (!validatePlayNameForSave(name)) {
+    return;
+  }
   // OneDriveが設定済みの場合は、端末共通の専用フォルダへ保存します。
   if (window.OneDriveStorage?.isConfigured()) {
     if (!window.OneDriveStorage.isConnected()) {
@@ -4017,6 +4060,11 @@ async function savePlayToLibrary() {
       return;
     }
     try {
+      const library = await window.OneDriveStorage.list();
+      if (!confirmLibraryOverwrite(library, name, state.libraryMeta.folder)) {
+        showToast("保存をキャンセルしました");
+        return;
+      }
       const payload = createExportPayload();
       const result = await window.OneDriveStorage.save(state.libraryMeta.folder, name, payload);
       autosave();
@@ -4038,6 +4086,11 @@ async function savePlayToLibrary() {
   // ブラウザーで選択したフォルダへ直接保存します。
   if (!isDataFolderMode() && window.PlayFolderAccess?.hasHandle()) {
     try {
+      const library = await window.PlayFolderAccess.list();
+      if (!confirmLibraryOverwrite(library, name, state.libraryMeta.folder)) {
+        showToast("保存をキャンセルしました");
+        return;
+      }
       const payload = createExportPayload();
       const relativePath = await window.PlayFolderAccess.save(state.libraryMeta.folder, name, payload);
       autosave();
@@ -4057,6 +4110,12 @@ async function savePlayToLibrary() {
     return;
   }
   try {
+    const existingResult = await requestFolderApi("/list");
+    const existingItems = (existingResult.items || []).map((item) => ({ ...item, source: "folder" }));
+    if (!confirmLibraryOverwrite(existingItems, name, state.libraryMeta.folder)) {
+      showToast("保存をキャンセルしました");
+      return;
+    }
     // 保存用データを作ります。
     const payload = createExportPayload();
     // フォルダ保存APIへ作戦を送ります。
@@ -4090,6 +4149,10 @@ function savePlayToLocalLibrary() {
   const library = readLocalLibrary();
   // 同名作戦の位置を探します。
   const existingIndex = library.findIndex((item) => item.name === name);
+  if (existingIndex >= 0 && !confirmLibraryOverwrite([library[existingIndex]], name, state.libraryMeta?.folder || "Shared")) {
+    showToast("保存をキャンセルしました");
+    return;
+  }
   // 保存データを作ります。
   const item = {
     // 既存IDまたは新規IDを設定します。
