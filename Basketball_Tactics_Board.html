@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=32" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=33" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -74,6 +74,8 @@
         <input id="importJsonInput" type="file" accept="application/json,.json" hidden />
         <!-- 現在のボードをPNG画像にします。 -->
         <button id="exportButton" class="button" type="button">PNG</button>
+        <!-- 全STEPの連続再生を動画として保存します。 -->
+        <button id="exportVideoButton" class="button" type="button" title="連続再生を動画として保存">動画保存</button>
       </div>
     </header>
 
@@ -444,6 +446,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=32"></script>
+  <script defer src="./1_App/js/app.js?v=33"></script>
 </body>
 </html>

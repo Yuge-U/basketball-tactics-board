@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=32" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=33" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -89,6 +89,14 @@
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.2-2h6.6l1.2 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"></path>
             <circle cx="12" cy="13" r="3.25"></circle>
+          </svg>
+        </button>
+        <!-- 全STEPの連続再生を動画として保存します。 -->
+        <button id="exportVideoButton" class="button icon-only-button top-action-icon video-export-button" type="button" aria-label="連続再生を動画として保存" title="連続再生を動画として保存" aria-busy="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3.5" y="6" width="12" height="12" rx="2"></rect>
+            <path d="M15.5 10l5-2.5v9l-5-2.5z"></path>
+            <path d="M8.5 9.5l3.5 2.5-3.5 2.5z"></path>
           </svg>
         </button>
       </div>
@@ -464,6 +472,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=32"></script>
+  <script defer src="./1_App/js/app.js?v=33"></script>
 </body>
 </html>

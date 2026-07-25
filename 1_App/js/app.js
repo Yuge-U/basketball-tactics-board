@@ -278,6 +278,8 @@ const disconnectOneDriveButton = document.getElementById("disconnectOneDriveButt
 let lastLibraryItems = [];
 // JSON読込用のファイル選択欄を取得します。
 const importJsonInput = document.getElementById("importJsonInput");
+// 連続再生を動画へ保存するボタンを取得します。
+const exportVideoButton = document.getElementById("exportVideoButton");
 // 移動線表示切替を取得します。
 const showMovementLinesToggle = document.getElementById("showMovementLinesToggle");
 // 最大表示用の操作領域を取得します。
@@ -404,6 +406,8 @@ let playbackFrame = null;
 let playbackVisual = null;
 // 再生処理を識別して安全に中断する番号を保持します。
 let playbackRunId = 0;
+// 動画録画中のMediaRecorderを保持します。
+let activeVideoRecorder = null;
 // Toastを消すタイマーを保持します。
 let toastTimer = null;
 // Canvasの表示変換情報を保持します。
@@ -3351,6 +3355,16 @@ function stepPlaybackBackward() {
   syncInterface(false);
 }
 
+// 連続再生できるSTEPまたは動作があるか確認します。
+function hasContinuousPlaybackContent() {
+  // STEPが複数あれば配置の切り替わりを再生対象として扱います。
+  if (state.steps.length > 1) {
+    return true;
+  }
+  // 選手移動・スクリーン・ドリブル・パスのいずれかがあるか確認します。
+  return state.steps.some((step) => step.lines.some((line) => line.type === "pass" || (isMovementLineType(line.type) && line.playerId)));
+}
+
 // STEPを順番に再生します。
 async function playSteps() {
   // 既に再生中なら停止します。
@@ -3369,10 +3383,8 @@ async function playSteps() {
     // 開始位置で再描画します。
     render();
   }
-  // 選手移動またはパスの再生対象があるか確認します。
-  const hasAnimation = state.steps.some((step) => step.lines.some((line) => line.type === "pass" || (isMovementLineType(line.type) && line.playerId)));
   // STEPが一つで再生対象もない場合は案内します。
-  if (state.steps.length <= 1 && !hasAnimation) {
+  if (!hasContinuousPlaybackContent()) {
     // 再生条件を通知します。
     showToast("選手から動作線を描くか、ボールからパス線を描いてください");
     // 処理を終了します。
@@ -3407,8 +3419,10 @@ async function playSteps() {
     // STEP間に短い間を入れます。
     await waitForPlayback(320, runId);
   }
+  // 今回の再生が最後まで完了したか保持します。
+  const completed = playbackTimer === runId;
   // 今回の再生が継続中なら終点で停止します。
-  if (playbackTimer === runId) {
+  if (completed) {
     // 最終STEPを取得します。
     const finalStepIndex = state.steps.length - 1;
     // 最終STEPの全動作完了位置へコマ送り状態を合わせます。
@@ -3416,6 +3430,8 @@ async function playSteps() {
     // 最終位置を表示したまま再生状態だけ解除します。
     finishPlaybackAtEnd();
   }
+  // 動画保存側で完了状態を判断できるよう返します。
+  return completed;
 }
 
 // STEP内の動作線を設定された順番で再生します。
@@ -3834,6 +3850,170 @@ function exportPng() {
   link.click();
   // 結果を通知します。
   showToast("PNGを書き出しました");
+}
+
+// ブラウザーが録画できる動画形式を互換性の高い順に返します。
+function getSupportedVideoFormat() {
+  // Safari系はMP4、Chrome・Edge系はWebMを利用できるよう候補を並べます。
+  const candidates = [
+    { mimeType: "video/mp4;codecs=avc1.42E01E", extension: "mp4" },
+    { mimeType: "video/mp4", extension: "mp4" },
+    { mimeType: "video/webm;codecs=vp9", extension: "webm" },
+    { mimeType: "video/webm;codecs=vp8", extension: "webm" },
+    { mimeType: "video/webm", extension: "webm" }
+  ];
+  // 形式判定APIがない場合はブラウザーの既定形式を使います。
+  const recorderClass = window.MediaRecorder;
+  if (typeof recorderClass?.isTypeSupported !== "function") {
+    return { mimeType: "", extension: "webm" };
+  }
+  // 最初に対応している形式を返します。
+  return candidates.find((candidate) => recorderClass.isTypeSupported(candidate.mimeType)) ?? { mimeType: "", extension: "webm" };
+}
+
+// 動画保存ボタンの録画中表示を切り替えます。
+function setVideoRecordingState(recording) {
+  // HTMLが古い場合は処理しません。
+  if (!exportVideoButton) {
+    return;
+  }
+  // 赤い録画中表示を切り替えます。
+  exportVideoButton.classList.toggle("recording", recording);
+  // 支援技術へ現在状態を通知します。
+  exportVideoButton.setAttribute("aria-busy", String(recording));
+  // ヒントテキストを現在状態へ合わせます。
+  const hint = recording ? "連続再生を動画へ録画中" : "連続再生を動画として保存";
+  exportVideoButton.setAttribute("aria-label", hint);
+  exportVideoButton.title = hint;
+}
+
+// Blobを端末へ動画ファイルとして保存します。
+function downloadRecordedVideo(blob, extension) {
+  // 一時URLを作ります。
+  const url = URL.createObjectURL(blob);
+  // ダウンロード用リンクを作ります。
+  const link = document.createElement("a");
+  // 最新の作戦名をファイル名へ反映します。
+  const safeName = (playNameInput.value.trim() || state.playName || "basketball-play").replace(/[\\/:*?"<>|]/g, "_");
+  // ファイル名を設定します。
+  link.download = `${safeName}-playback.${extension}`;
+  // 動画データをリンクへ設定します。
+  link.href = url;
+  // iPhone・iPadでもリンクを認識しやすいよう画面内へ一時追加します。
+  document.body.appendChild(link);
+  // 保存を開始します。
+  link.click();
+  // 一時リンクを削除します。
+  link.remove();
+  // 保存開始後に一時URLを解放します。
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// 全STEPの連続再生をCanvasから録画して動画へ保存します。
+async function exportPlaybackVideo() {
+  // 二重録画を防ぎます。
+  if (activeVideoRecorder) {
+    showToast("動画を録画中です");
+    return;
+  }
+  // 通常再生中の開始操作は録画位置が曖昧になるため案内します。
+  if (playbackTimer) {
+    showToast("再生を停止してから動画保存を開始してください");
+    return;
+  }
+  // 再生対象がない場合は録画を開始しません。
+  if (!hasContinuousPlaybackContent()) {
+    showToast("動画にする動作または複数STEPを作成してください");
+    return;
+  }
+  // Canvas録画APIへ対応しているか確認します。
+  if (typeof canvas.captureStream !== "function" || typeof window.MediaRecorder !== "function") {
+    window.alert("このブラウザーは動画保存に対応していません。最新版のSafari、Chrome、Edgeでお試しください。");
+    return;
+  }
+
+  // 録画用の値を初期化します。
+  let stream = null;
+  let recorder = null;
+  let recorderDone = null;
+  const chunks = [];
+  try {
+    // 録画開始前にCanvasを最新状態で描画します。
+    render();
+    // Canvasを30fpsの動画ストリームへ変換します。
+    stream = canvas.captureStream(30);
+    // 利用可能な動画形式を選びます。
+    const format = getSupportedVideoFormat();
+    // コート解像度に合わせて画質を確保します。
+    const videoBitsPerSecond = Math.max(2500000, Math.min(8000000, canvas.width * canvas.height * 8));
+    // 対応形式が判明している場合だけ明示して録画機を作ります。
+    const options = format.mimeType ? { mimeType: format.mimeType, videoBitsPerSecond } : { videoBitsPerSecond };
+    recorder = new window.MediaRecorder(stream, options);
+    // 録画中状態を保存します。
+    activeVideoRecorder = recorder;
+    // 動画保存ボタンを録画中表示へ切り替えます。
+    setVideoRecordingState(true);
+    // 録画片を順番に保持します。
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size > 0) {
+        chunks.push(event.data);
+      }
+    });
+    // 録画停止またはエラーを待つPromiseを作ります。
+    recorderDone = new Promise((resolve, reject) => {
+      recorder.addEventListener("stop", resolve, { once: true });
+      recorder.addEventListener("error", (event) => reject(event.error ?? new Error("動画録画に失敗しました")), { once: true });
+    });
+    // 録画片を定期的に受け取りながら開始します。
+    recorder.start(250);
+    // 最初の静止画を短時間入れて再生開始位置を見やすくします。
+    await new Promise((resolve) => window.setTimeout(resolve, 350));
+    // 全STEPを先頭から連続再生します。
+    const completed = await playSteps();
+    // 最終位置を動画へ残します。
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    // 録画を停止します。
+    if (recorder.state !== "inactive") {
+      recorder.stop();
+    }
+    // 最終データが届くまで待ちます。
+    await recorderDone;
+    // データが作られなかった場合はエラーにします。
+    if (chunks.length === 0) {
+      throw new Error("動画データを作成できませんでした");
+    }
+    // 実際に出力された形式から拡張子を決めます。
+    const actualMimeType = recorder.mimeType || chunks[0].type || format.mimeType || "video/webm";
+    const extension = actualMimeType.includes("mp4") ? "mp4" : format.extension;
+    // 動画Blobを作成して保存します。
+    downloadRecordedVideo(new Blob(chunks, { type: actualMimeType }), extension);
+    // 完了状態に応じた結果を通知します。
+    showToast(completed ? `動画（${extension.toUpperCase()}）を書き出しました` : `停止位置までの動画（${extension.toUpperCase()}）を書き出しました`);
+  } catch (error) {
+    // 再生中なら安全に停止します。
+    if (playbackTimer) {
+      stopPlayback(false);
+    }
+    // 開発者向けに詳細を残します。
+    console.error("動画を書き出せませんでした。", error);
+    // 利用者へ簡潔に案内します。
+    window.alert(`動画を書き出せませんでした。\n\n${error.message}`);
+  } finally {
+    // エラー時も録画機を停止します。
+    if (recorder && recorder.state !== "inactive") {
+      recorder.stop();
+      try {
+        await recorderDone;
+      } catch {
+        // 元のエラー表示を優先します。
+      }
+    }
+    // Canvas録画用トラックを終了します。
+    stream?.getTracks().forEach((track) => track.stop());
+    // 録画中状態を解除します。
+    activeVideoRecorder = null;
+    setVideoRecordingState(false);
+  }
 }
 
 // 現在作戦をJSONファイルへ書き出します。
@@ -4789,6 +4969,8 @@ document.getElementById("importJsonButton").addEventListener("click", () => impo
 importJsonInput.addEventListener("change", importJson);
 // PNG出力ボタンを登録します。
 document.getElementById("exportButton").addEventListener("click", exportPng);
+// 連続再生の動画出力ボタンを登録します。
+exportVideoButton?.addEventListener("click", exportPlaybackVideo);
 // OneDrive設定を開くボタンを登録します。
 if (connectFolderButton) connectFolderButton.addEventListener("click", openOneDriveSettings);
 if (oneDriveButton) oneDriveButton.addEventListener("click", openOneDriveSettings);
