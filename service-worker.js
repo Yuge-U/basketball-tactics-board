@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v28-stable-history-mobile-layout";
+const CACHE_NAME = "basketball-tactics-board-v29-compact-markers-ios-safe-area";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

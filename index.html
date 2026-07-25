@@ -14,13 +14,13 @@
   <!-- iPadのホーム画面から単独アプリとして起動できるようにします。 -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <!-- iPadでのステータスバー表示を指定します。 -->
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <!-- iPadのホーム画面に表示するアプリ名です。 -->
   <meta name="apple-mobile-web-app-title" content="Tactics Board" />
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=28" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=29" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -70,7 +70,12 @@
         <!-- 現在の作戦を個人用OneDriveへ保存します。 -->
         <button id="savePlayButton" class="button primary icon-only-button top-action-icon" type="button" aria-label="作戦を保存" title="作戦を保存">💾</button>
         <!-- OneDrive内の作戦一覧を開きます。 -->
-        <button id="openLibraryButton" class="button icon-only-button top-action-icon" type="button" aria-label="ライブラリを開く" title="ライブラリを開く">▦</button>
+        <button id="openLibraryButton" class="button icon-only-button top-action-icon" type="button" aria-label="ライブラリを開く" title="ライブラリを開く">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3.5 6.5h6l2 2h9v10.5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5z"></path>
+            <path d="M3.5 8.5v-2A1.5 1.5 0 0 1 5 5h4.5l2 2h7A1.5 1.5 0 0 1 20 8.5"></path>
+          </svg>
+        </button>
         <!-- 個人用OneDriveの接続状態と設定を開きます。 -->
         <button id="oneDriveButton" class="button onedrive-button icon-only-button top-action-icon" type="button" aria-label="OneDrive設定" title="OneDrive設定">☁</button>
         <!-- 現在の作戦データをJSONファイルへ書き出します。 -->
@@ -80,7 +85,12 @@
         <!-- JSON読込で使う非表示のファイル選択欄です。 -->
         <input id="importJsonInput" type="file" accept="application/json,.json" hidden />
         <!-- 現在のボードをPNG画像にします。 -->
-        <button id="exportButton" class="button icon-only-button top-action-icon" type="button" aria-label="PNG画像を保存" title="PNG画像を保存">▧</button>
+        <button id="exportButton" class="button icon-only-button top-action-icon" type="button" aria-label="PNG画像を保存" title="PNG画像を保存">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.2-2h6.6l1.2 2h2A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5z"></path>
+            <circle cx="12" cy="13" r="3.25"></circle>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -454,6 +464,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=28"></script>
+  <script defer src="./1_App/js/app.js?v=29"></script>
 </body>
 </html>

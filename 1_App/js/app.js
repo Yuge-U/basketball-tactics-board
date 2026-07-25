@@ -20,12 +20,12 @@ const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 const SCHEMA_VERSION = 11;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
-  // 現在まで使っていた最大サイズです。
-  large: { radius: 27, fontSize: 23, lineWidth: 5 },
-  // 最大サイズより約2割小さい中サイズです。
-  medium: { radius: 22, fontSize: 19, lineWidth: 4 },
-  // 混雑した配置で使いやすい小サイズです。
-  small: { radius: 17, fontSize: 15, lineWidth: 3 }
+  // 旧「小」を新しい「大」として使います。
+  large: { radius: 17, fontSize: 15, lineWidth: 3 },
+  // 新しい「大」より一段小さい中サイズです。
+  medium: { radius: 14, fontSize: 12, lineWidth: 2.5 },
+  // 密集した配置でも重なりにくい小サイズです。
+  small: { radius: 11, fontSize: 10, lineWidth: 2 }
 };
 
 // 選手サイズ名を利用可能な値へ補正します。
@@ -73,8 +73,15 @@ function normalizeSpeed(value) {
   // 0.25刻みに丸めて最小値と最大値の範囲へ収めます。
   return Math.max(MIN_SPEED, Math.min(MAX_SPEED, Math.round(parsed * 4) / 4));
 }
-// ボールマーカーの半径を定義します。
-const BALL_RADIUS = 17;
+// 旧フルコート側の見た目に合わせた表示上の半径です。
+const BALL_DISPLAY_RADIUS = 13;
+
+// コート種別や拡大率にかかわらずボールを同じ画面サイズにします。
+function getBallRadius() {
+  const displayScale = Math.max(0.01, Number(viewport?.scale) || 1);
+  const deviceScale = mobileLayoutEnabled && window.innerWidth <= 600 ? 0.78 : 1;
+  return BALL_DISPLAY_RADIUS * deviceScale / displayScale;
+}
 // コーンの描画幅を定義します。
 const CONE_WIDTH = 34;
 // コーンの描画高さを定義します。
@@ -1441,16 +1448,17 @@ function drawPlayer(ctx, player, isActive = false) {
 
 // ボールを描きます。
 function drawBall(ctx, ball) {
+  const ballRadius = getBallRadius();
   // ボール以外の描画設定へ影響しないように現在状態を保存します。
   ctx.save();
   // 左上に明るさを置いたグラデーションでボールの丸みを表現します。
   const ballFill = ctx.createRadialGradient(
-    ball.x - BALL_RADIUS * 0.36,
-    ball.y - BALL_RADIUS * 0.42,
-    BALL_RADIUS * 0.08,
+    ball.x - ballRadius * 0.36,
+    ball.y - ballRadius * 0.42,
+    ballRadius * 0.08,
     ball.x,
     ball.y,
-    BALL_RADIUS * 1.08
+    ballRadius * 1.08
   );
   ballFill.addColorStop(0, "#fdba74");
   ballFill.addColorStop(0.48, "#f97316");
@@ -1464,7 +1472,7 @@ function drawBall(ctx, ball) {
   // ボール円を開始します。
   ctx.beginPath();
   // ボール位置に円を描きます。
-  ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+  ctx.arc(ball.x, ball.y, ballRadius, 0, Math.PI * 2);
   // ボールを塗ります。
   ctx.fill();
   // ボール枠を描きます。
@@ -1472,40 +1480,40 @@ function drawBall(ctx, ball) {
   // 縫い目をボールの内側だけへ収めます。
   ctx.save();
   ctx.beginPath();
-  ctx.arc(ball.x, ball.y, BALL_RADIUS - 1.2, 0, Math.PI * 2);
+  ctx.arc(ball.x, ball.y, Math.max(1, ballRadius - 1.2), 0, Math.PI * 2);
   ctx.clip();
   ctx.strokeStyle = "#57210f";
   ctx.lineWidth = 1.9;
   ctx.lineCap = "round";
   // 中央の縦の縫い目を描きます。
   ctx.beginPath();
-  ctx.moveTo(ball.x, ball.y - BALL_RADIUS);
-  ctx.lineTo(ball.x, ball.y + BALL_RADIUS);
+  ctx.moveTo(ball.x, ball.y - ballRadius);
+  ctx.lineTo(ball.x, ball.y + ballRadius);
   ctx.stroke();
   // 中央の横の縫い目を描きます。
   ctx.beginPath();
-  ctx.moveTo(ball.x - BALL_RADIUS, ball.y);
-  ctx.lineTo(ball.x + BALL_RADIUS, ball.y);
+  ctx.moveTo(ball.x - ballRadius, ball.y);
+  ctx.lineTo(ball.x + ballRadius, ball.y);
   ctx.stroke();
   // 左右の曲線でバスケットボール特有のパネル形状を描きます。
   ctx.beginPath();
-  ctx.moveTo(ball.x, ball.y - BALL_RADIUS);
+  ctx.moveTo(ball.x, ball.y - ballRadius);
   ctx.bezierCurveTo(
-    ball.x - BALL_RADIUS * 0.78,
-    ball.y - BALL_RADIUS * 0.62,
-    ball.x - BALL_RADIUS * 0.78,
-    ball.y + BALL_RADIUS * 0.62,
+    ball.x - ballRadius * 0.78,
+    ball.y - ballRadius * 0.62,
+    ball.x - ballRadius * 0.78,
+    ball.y + ballRadius * 0.62,
     ball.x,
-    ball.y + BALL_RADIUS
+    ball.y + ballRadius
   );
-  ctx.moveTo(ball.x, ball.y - BALL_RADIUS);
+  ctx.moveTo(ball.x, ball.y - ballRadius);
   ctx.bezierCurveTo(
-    ball.x + BALL_RADIUS * 0.78,
-    ball.y - BALL_RADIUS * 0.62,
-    ball.x + BALL_RADIUS * 0.78,
-    ball.y + BALL_RADIUS * 0.62,
+    ball.x + ballRadius * 0.78,
+    ball.y - ballRadius * 0.62,
+    ball.x + ballRadius * 0.78,
+    ball.y + ballRadius * 0.62,
     ball.x,
-    ball.y + BALL_RADIUS
+    ball.y + ballRadius
   );
   ctx.stroke();
   ctx.restore();
@@ -1914,7 +1922,7 @@ function findDraggableAt(point) {
     return { type: "text", id: textItem.id };
   }
   // ボールに近い場合はボールを返します。
-  if (distance(point, step.ball) <= BALL_RADIUS + 12) {
+  if (distance(point, step.ball) <= getBallRadius() + 12 / Math.max(0.01, viewport.scale)) {
     return { type: "ball", id: step.ball.id };
   }
   // 後に描いた選手から逆順で探します。
@@ -2024,7 +2032,8 @@ function getLinePoints(line) {
 // 選手位置からドリブル中のボール表示位置を作ります。
 function getBallPositionBesidePlayer(point) {
   // 選手の右上へ少しずらした位置を返します。
-  return { x: point.x + BALL_RADIUS + 8, y: point.y - BALL_RADIUS - 4 };
+  const ballRadius = getBallRadius();
+  return { x: point.x + ballRadius + 8, y: point.y - ballRadius - 4 };
 }
 
 // 2点を指定割合で補間します。
@@ -2385,7 +2394,7 @@ function handlePointerMove(event) {
     // 対象がボールの場合を処理します。
     if (dragSession.target.type === "ball") {
       // ボールをコート内へ収めます。
-      const next = clampPoint(point, BALL_RADIUS + 4);
+      const next = clampPoint(point, getBallRadius() + 4);
       // X位置を更新します。
       step.ball.x = next.x;
       // Y位置を更新します。
