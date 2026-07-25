@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=25" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=26" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -163,18 +163,18 @@
           <!-- コート最大化時に使う最小操作ボタンです。 -->
           <div id="focusControls" class="focus-controls" aria-label="最大表示の操作">
             <!-- 最大表示を終了します。 -->
-            <button id="exitFocusButton" class="focus-button" type="button">✕ 閉じる</button>
+            <button id="exitFocusButton" class="focus-button" type="button" aria-label="最大表示を閉じる" title="最大表示を閉じる">×</button>
             <!-- 一つ前の動作またはSTEPへ戻ります。 -->
-            <button id="focusPreviousFrameButton" class="focus-button" type="button">◀ 前へ</button>
+            <button id="focusPreviousFrameButton" class="focus-button" type="button" aria-label="前へ" title="前へ">⏮</button>
             <!-- 最大表示のまま全STEPを連続再生します。 -->
-            <button id="focusPlayButton" class="focus-button primary" type="button">▶ 再生</button>
+            <button id="focusPlayButton" class="focus-button primary hidden" type="button" aria-label="再生" title="再生">▶</button>
             <!-- 次の動作またはSTEPへ進みます。 -->
-            <button id="focusNextFrameButton" class="focus-button" type="button">次へ ▶</button>
+            <button id="focusNextFrameButton" class="focus-button" type="button" aria-label="次へ" title="次へ">⏭</button>
           </div>
           <!-- 最大表示中の再生ボタンとSTEP一覧を薄いアイコンで開閉します。 -->
           <div class="focus-visibility-controls" aria-label="最大表示中の表示切替">
-            <button id="focusPlayVisibilityButton" class="focus-visibility-button active" type="button" aria-pressed="true" title="再生ボタンを隠す">▶</button>
-            <button id="focusStepsVisibilityButton" class="focus-visibility-button active" type="button" aria-pressed="true" title="STEP一覧を隠す">≡</button>
+            <button id="focusPlayVisibilityButton" class="focus-visibility-button" type="button" aria-pressed="false" title="再生ボタンを表示">▶</button>
+            <button id="focusStepsVisibilityButton" class="focus-visibility-button" type="button" aria-pressed="false" title="STEP一覧を表示">≡</button>
           </div>
           <!-- 最大表示中のSTEP一覧です。 -->
           <div id="focusStepList" class="focus-step-list" aria-label="最大表示中の作戦ステップ"></div>
@@ -322,14 +322,6 @@
           <label for="stepNote">コーチングポイント</label>
           <textarea id="stepNote" rows="8" placeholder="例：5番がスクリーン後にダイブ。1番はヘルプの位置を見て判断する。"></textarea>
         </section>
-        <!-- 操作ショートカットを表示します。 -->
-        <section class="panel-card shortcuts">
-          <h2>操作</h2>
-          <p><kbd>Ctrl</kbd>＋<kbd>Z</kbd> 元に戻す</p>
-          <p><kbd>Ctrl</kbd>＋<kbd>Y</kbd> やり直す</p>
-          <p><kbd>1〜9</kbd> 描画ツール／<kbd>0</kbd> テキスト</p>
-          <p>前へ・次へ：動作単位のコマ送り</p>
-        </section>
       </aside>
     </section>
   </main>
@@ -452,6 +444,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=25"></script>
+  <script defer src="./1_App/js/app.js?v=26"></script>
 </body>
 </html>
