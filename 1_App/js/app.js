@@ -427,7 +427,7 @@ function createInitialState() {
   const firstStep = createDefaultStep(1, HALF_COURT);
   // アプリ状態を返します。
   return {
-    playName: "新しい作戦",
+    playName: "new play",
     libraryMeta: { folder: "Shared", tags: [], favorite: false },
     courtMode: "half",
     activeTool: "select",
@@ -669,7 +669,7 @@ function applySnapshot(snapshot) {
   // 旧版データを含めて現行形式へ変換します。
   const migrated = migrateSnapshot(snapshot);
   // 作戦名を復元します。
-  state.playName = migrated.playName ?? "新しい作戦";
+  state.playName = migrated.playName ?? "new play";
   // ライブラリ管理情報を復元します。
   state.libraryMeta = migrated.libraryMeta ?? { folder: "Shared", tags: [], favorite: false };
   if (playFolderInput) playFolderInput.value = state.libraryMeta.folder || "Shared";
