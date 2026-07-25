@@ -1,1 +1,1 @@
-Basketball Tactics Board v26 - Reset canvas fix / hidden fullscreen overlays / compact focus icons
+Basketball Tactics Board v27 - Icon-first controls / always-visible fullscreen play / larger court
