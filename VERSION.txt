@@ -1,1 +1,1 @@
-Basketball Tactics Board v29 - Compact markers / fixed ball scale / iOS safe area / folder-camera icons
+Basketball Tactics Board v30 - New play default title
