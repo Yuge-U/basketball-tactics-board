@@ -4,6 +4,8 @@ const HALF_COURT = { width: 1050, height: 980 };
 const FULL_COURT = { width: 1120, height: 600 };
 // スローイン配置に使うコート外周の論理余白を定義します。
 const COURT_OUTER_MARGIN = 60;
+// コートへ表示する著作権表記です。
+const COPYRIGHT_TEXT = "© 2026 Yuge-U. All rights reserved.";
 // v8の半面コート論理サイズを移行処理用に定義します。
 const V8_HALF_COURT = { width: 1280, height: 760 };
 // v6までの半面コート論理サイズを移行処理用に定義します。
@@ -926,8 +928,26 @@ function render() {
     // コート上へ配置したテキストを最前面に描きます。
     step.texts.forEach((textItem) => drawCourtText(context, textItem));
   }
+  // PNG保存にも残るよう、すべての戦術要素より手前へ著作権表記を描きます。
+  drawCopyrightWatermark(context);
   // コート座標系を解除します。
   context.restore();
+}
+
+// コート右下へ小さく薄い著作権表記を描きます。
+function drawCopyrightWatermark(ctx) {
+  const size = getCourtSize();
+  const displayScale = Math.max(0.01, Number(viewport?.scale) || 1);
+  const displayFontSize = window.innerWidth <= 600 ? 7 : 9;
+  const fontSize = displayFontSize / displayScale;
+  const padding = 9 / displayScale;
+  ctx.save();
+  ctx.fillStyle = "rgba(17, 24, 39, 0.28)";
+  ctx.font = `500 ${fontSize}px sans-serif`;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "bottom";
+  ctx.fillText(COPYRIGHT_TEXT, size.width - padding, size.height - padding);
+  ctx.restore();
 }
 
 // 再生中の選手位置があれば表示用に合成します。
