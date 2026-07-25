@@ -25,6 +25,10 @@ try {
   document.head.appendChild(style);
   const iconData = `data:image/png;base64,${bundle.icon}`;
   document.querySelectorAll(".brand-mark img").forEach((img) => { img.src = iconData; });
+  const manifestLink = document.createElement("link");
+  manifestLink.rel = "manifest";
+  manifestLink.href = "./manifest.webmanifest";
+  document.head.appendChild(manifestLink);
   const appleIcon = document.createElement("link");
   appleIcon.rel = "apple-touch-icon";
   appleIcon.href = iconData;
