@@ -263,8 +263,6 @@ const focusControls = document.getElementById("focusControls");
 const focusPlayButton = document.getElementById("focusPlayButton");
 // 最大表示用のSTEP一覧を取得します。
 const focusStepList = document.getElementById("focusStepList");
-// 最大表示中の再生ボタン表示切替を取得します。
-const focusPlayVisibilityButton = document.getElementById("focusPlayVisibilityButton");
 // 最大表示中のSTEP一覧表示切替を取得します。
 const focusStepsVisibilityButton = document.getElementById("focusStepsVisibilityButton");
 // 最大表示中の編集パネルを取得します。
@@ -376,7 +374,6 @@ function createInitialState() {
     movementSpeed: 1,
     playbackSpeed: 1,
     showMovementLines: true,
-    focusShowPlayButton: false,
     focusShowSteps: false,
     activeStepId: firstStep.id,
     steps: [firstStep]
@@ -605,11 +602,8 @@ function migrateSnapshot(snapshot) {
 
 // 履歴スナップショットを状態へ適用します。
 function applySnapshot(snapshot) {
-  // 最大表示中の一時的な表示切替は履歴や保存データとは分離します。
-  const focusVisibility = {
-    play: isFocusMode ? state.focusShowPlayButton : false,
-    steps: isFocusMode ? state.focusShowSteps : false
-  };
+  // 最大表示中のSTEP一覧の一時的な表示切替は履歴や保存データとは分離します。
+  const focusStepsVisible = isFocusMode ? state.focusShowSteps : false;
   // 旧版データを含めて現行形式へ変換します。
   const migrated = migrateSnapshot(snapshot);
   // 作戦名を復元します。
@@ -631,9 +625,8 @@ function applySnapshot(snapshot) {
   state.playbackSpeed = normalizeSpeed(migrated.playbackSpeed);
   // 移動線の表示設定を復元します。
   state.showMovementLines = migrated.showMovementLines !== false;
-  // 最大表示の再生ボタンとSTEP一覧は標準表示とし、最大表示中だけ一時切替を維持します。
-  state.focusShowPlayButton = focusVisibility.play;
-  state.focusShowSteps = focusVisibility.steps;
+  // 最大表示のSTEP一覧は最大表示中だけ一時切替を維持します。
+  state.focusShowSteps = focusStepsVisible;
   // STEPを復元します。
   state.steps = migrated.steps ?? [];
   // 各STEPに不足している配列を補います。
@@ -727,8 +720,8 @@ function resizeCanvas() {
     const availableWidth = canvasShell.parentElement?.clientWidth || window.innerWidth;
     // Canvas上端から画面下端までの高さを取得します。
     const top = canvasShell.getBoundingClientRect().top;
-    // STEP操作分を少し残しながら使える高さを計算します。
-    const availableHeight = Math.max(300, window.innerHeight - top - 70);
+    // コンパクトなSTEP操作分だけを残し、コートへ使える高さを最大化します。
+    const availableHeight = Math.max(300, window.innerHeight - top - 48);
     // 横幅と高さの両方へ収まる表示幅を計算します。
     const fittedWidth = Math.min(availableWidth, availableHeight * courtRatio);
     // 計算した幅を設定します。
@@ -2509,24 +2502,28 @@ function setPlayerSize(sizeName) {
 
 // 再生ボタンの表示文字を一括更新します。
 function updatePlayButtonLabels(label) {
-  // 通常表示の再生ボタンを更新します。
-  document.getElementById("playStepsButton").textContent = label;
-  // 最大表示では短い文言へ置き換えます。
-  focusPlayButton.textContent = label.includes("停止") ? "■" : "▶";
-  focusPlayButton.setAttribute("aria-label", label.includes("停止") ? "停止" : "再生");
-  focusPlayButton.title = label.includes("停止") ? "停止" : "再生";
+  // 通常表示と最大表示を同じ短いアイコンへ更新します。
+  const isStopping = label.includes("停止");
+  const icon = isStopping ? "■" : "▶";
+  const hint = isStopping ? "停止" : "再生";
+  const playStepsButton = document.getElementById("playStepsButton");
+  playStepsButton.textContent = icon;
+  playStepsButton.setAttribute("aria-label", hint);
+  playStepsButton.title = hint;
+  focusPlayButton.textContent = icon;
+  focusPlayButton.setAttribute("aria-label", hint);
+  focusPlayButton.title = hint;
 }
 
-// 最大表示中の再生ボタンとSTEP一覧の表示状態を同期します。
+// 最大表示中のSTEP一覧の表示状態を同期します。再生ボタンは常時表示します。
 function syncFocusVisibility() {
-  focusPlayButton.classList.toggle("hidden", !state.focusShowPlayButton);
+  focusPlayButton.classList.remove("hidden");
   focusStepList.classList.toggle("hidden", !state.focusShowSteps);
-  focusPlayVisibilityButton.classList.toggle("active", state.focusShowPlayButton);
-  focusPlayVisibilityButton.setAttribute("aria-pressed", String(state.focusShowPlayButton));
-  focusPlayVisibilityButton.title = state.focusShowPlayButton ? "再生ボタンを隠す" : "再生ボタンを表示";
   focusStepsVisibilityButton.classList.toggle("active", state.focusShowSteps);
   focusStepsVisibilityButton.setAttribute("aria-pressed", String(state.focusShowSteps));
-  focusStepsVisibilityButton.title = state.focusShowSteps ? "STEP一覧を隠す" : "STEP一覧を表示";
+  const hint = state.focusShowSteps ? "STEP一覧を隠す" : "STEP一覧を表示";
+  focusStepsVisibilityButton.setAttribute("aria-label", hint);
+  focusStepsVisibilityButton.title = hint;
 }
 
 // 最大表示中のSTEP一覧を描画します。
@@ -2580,8 +2577,7 @@ function setFocusMode(enabled) {
   document.body.classList.toggle("board-focus", isFocusMode);
   // 最大表示へ入る場合を処理します。
   if (isFocusMode) {
-    // 最大表示へ入るたび、再生ボタンとSTEP一覧を標準の非表示へ戻します。
-    state.focusShowPlayButton = false;
+    // 最大表示へ入るたび、STEP一覧を標準の非表示へ戻します。
     state.focusShowSteps = false;
     // ブラウザーが対応していれば全画面表示も試します。
     document.documentElement.requestFullscreen?.().catch(() => undefined);
@@ -2808,10 +2804,10 @@ function setPlayerNumberDetailsVisible(visible) {
   playerNumberDetails.classList.toggle("hidden", !playerNumberDetailsVisible);
   playerNumberDetailsToggle.classList.toggle("active", playerNumberDetailsVisible);
   playerNumberDetailsToggle.setAttribute("aria-expanded", String(playerNumberDetailsVisible));
-  playerNumberDetailsToggle.textContent = playerNumberDetailsVisible ? "123 閉じる" : "123 全番号";
-  playerNumberDetailsToggle.title = playerNumberDetailsVisible
-    ? "全番号を閉じる"
-    : "全番号を表示。番号を押すと現在STEPへ追加・削除できます";
+  playerNumberDetailsToggle.textContent = "123";
+  const hint = playerNumberDetailsVisible ? "全番号を閉じる" : "全番号を表示";
+  playerNumberDetailsToggle.setAttribute("aria-label", hint);
+  playerNumberDetailsToggle.title = hint;
 }
 
 // オフェンスとディフェンスの0番から18番ボタンを描画します。
@@ -3877,7 +3873,10 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
   }
 
   if (oneDriveButton) {
-    oneDriveButton.textContent = connected ? "☁ OneDrive接続中" : configured ? "OneDrive接続" : "OneDrive設定";
+    const buttonHint = connected ? "OneDrive接続中・設定を開く" : configured ? "OneDriveへ接続" : "OneDrive設定";
+    oneDriveButton.textContent = "☁";
+    oneDriveButton.setAttribute("aria-label", buttonHint);
+    oneDriveButton.title = buttonHint;
     oneDriveButton.classList.toggle("connected", connected);
   }
   if (connectOneDriveButton) {
@@ -4603,11 +4602,6 @@ focusPlayButton.addEventListener("click", playSteps);
 focusPreviousFrameButton.addEventListener("click", stepPlaybackBackward);
 // 最大表示用の次へボタンを登録します。
 focusNextFrameButton.addEventListener("click", stepPlaybackForward);
-// 最大表示中の再生ボタン表示切替を登録します。
-focusPlayVisibilityButton.addEventListener("click", () => {
-  state.focusShowPlayButton = !state.focusShowPlayButton;
-  syncFocusVisibility();
-});
 // 最大表示中のSTEP一覧表示切替を登録します。
 focusStepsVisibilityButton.addEventListener("click", () => {
   state.focusShowSteps = !state.focusShowSteps;
