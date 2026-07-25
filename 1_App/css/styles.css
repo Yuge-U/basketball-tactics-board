@@ -1907,3 +1907,269 @@ body.board-focus .focus-controls {
     padding: 14px;
   }
 }
+
+/* v28: 文字を使わないお気に入り切替です。 */
+.play-favorite-toggle {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  flex: 0 0 32px;
+  place-items: center;
+  gap: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.play-favorite-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.favorite-star::before {
+  content: "☆";
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.play-favorite-toggle input:checked + .favorite-star::before {
+  content: "★";
+  color: #fbbf24;
+}
+
+.play-favorite-toggle:focus-within {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.48);
+}
+
+/* v28: ハーフ・フルを小さなコート図で切り替えます。 */
+.court-mode-button {
+  width: 46px;
+  min-width: 46px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  padding: 3px 7px;
+}
+
+.court-mode-button svg {
+  width: 31px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* v28: モバイル表示切替を端末アイコンで示します。 */
+.mobile-layout-button svg {
+  width: 19px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+}
+
+.mobile-layout-button.active {
+  border-color: #60a5fa;
+  color: #ffffff;
+  background: #2563eb;
+}
+
+/* v28: 右欄では動作順を先に、選手追加をコーンの後へ配置します。 */
+.display-settings {
+  order: 1;
+}
+
+.action-order-card {
+  order: 2;
+}
+
+.cone-manager-card {
+  order: 3;
+}
+
+.player-manager-card {
+  order: 4;
+}
+
+.note-card {
+  order: 5;
+}
+
+/* v28: デスクトップの左右余白を詰め、全面コートへ横幅を渡します。 */
+@media (min-width: 901px) {
+  .workspace {
+    grid-template-columns: 56px minmax(0, 1fr) 236px;
+    gap: 8px;
+    padding: 8px 8px 3px;
+  }
+
+  .tool-panel {
+    padding: 4px;
+  }
+}
+
+/* v28: 手動切替とiPadの自動判定で使うタッチ操作レイアウトです。 */
+body.mobile-layout .topbar {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  padding: 6px 8px;
+}
+
+body.mobile-layout .brand-mark {
+  display: none;
+}
+
+body.mobile-layout .brand-copy {
+  grid-template-columns: minmax(135px, 210px) minmax(0, 1fr);
+  gap: 7px;
+}
+
+body.mobile-layout .top-actions {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding-bottom: 1px;
+  scrollbar-width: thin;
+}
+
+body.mobile-layout .workspace {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+}
+
+body.mobile-layout .board-column {
+  order: 1;
+  width: 100%;
+  gap: 6px;
+}
+
+body.mobile-layout .tool-panel {
+  order: 2;
+  position: sticky;
+  bottom: 4px;
+  z-index: 20;
+  width: 100%;
+  max-height: none;
+  display: flex;
+  flex-direction: row;
+  gap: 3px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px;
+  border-radius: 12px;
+  scrollbar-width: thin;
+}
+
+body.mobile-layout .tool-button {
+  width: 50px;
+  min-width: 50px;
+  min-height: 48px;
+  flex: 0 0 50px;
+}
+
+body.mobile-layout .detail-panel {
+  order: 3;
+  width: 100%;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow: visible;
+}
+
+body.mobile-layout .board-controls {
+  gap: 5px;
+}
+
+body.mobile-layout .canvas-shell {
+  border-radius: 13px;
+}
+
+body.mobile-layout .step-panel {
+  min-height: 36px;
+  flex-direction: row;
+  align-items: center;
+}
+
+body.mobile-layout .step-actions {
+  display: flex;
+  flex-wrap: nowrap;
+}
+
+body.mobile-layout .panel-card {
+  padding: 11px;
+  border-radius: 13px;
+}
+
+/* iPadでは設定欄を2列にして縦スクロール量を抑えます。 */
+@media (min-width: 700px) and (max-width: 1100px) {
+  body.mobile-layout .detail-panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  body.mobile-layout .note-card {
+    grid-column: 1 / -1;
+  }
+}
+
+/* iPhoneではヘッダーと操作列を1本ずつの横スクロールへまとめます。 */
+@media (max-width: 600px) {
+  body.mobile-layout .brand-copy {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  body.mobile-layout .play-meta-inline {
+    display: flex;
+    gap: 5px;
+  }
+
+  body.mobile-layout .play-meta-inline .meta-input {
+    display: none;
+  }
+
+  body.mobile-layout .play-meta-inline .meta-select {
+    width: min(54vw, 180px);
+  }
+
+  body.mobile-layout .top-actions {
+    gap: 5px;
+  }
+
+  body.mobile-layout .workspace {
+    padding: 5px 5px 2px;
+  }
+
+  body.mobile-layout .status-pill {
+    display: none;
+  }
+
+  body.mobile-layout .history-actions {
+    margin-left: auto;
+  }
+
+  body.mobile-layout .step-list {
+    flex: 1;
+  }
+
+  body.mobile-layout .step-chip {
+    min-width: 58px;
+  }
+
+  body.mobile-layout .detail-panel {
+    display: flex;
+  }
+}
