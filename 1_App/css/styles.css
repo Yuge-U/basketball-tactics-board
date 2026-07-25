@@ -1609,6 +1609,21 @@ body.board-focus .focus-controls {
   font-size: 17px;
 }
 
+/* 動画録画中であることを赤いアイコンで明確に示します。 */
+.top-actions .video-export-button.recording {
+  border-color: #dc2626;
+  color: #ffffff;
+  background: #dc2626;
+  animation: video-recording-pulse 1.2s ease-in-out infinite;
+}
+
+/* 録画中アイコンを控えめに点滅させます。 */
+@keyframes video-recording-pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18);
+  }
+}
+
 .top-actions .code-icon {
   font-size: 11px;
   letter-spacing: -0.08em;

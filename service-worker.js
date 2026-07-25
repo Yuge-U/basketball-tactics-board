@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v32-court-copyright";
+const CACHE_NAME = "basketball-tactics-board-v33-video-export";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
