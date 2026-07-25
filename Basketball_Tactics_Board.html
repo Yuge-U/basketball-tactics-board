@@ -167,9 +167,14 @@
             <!-- 一つ前の動作またはSTEPへ戻ります。 -->
             <button id="focusPreviousFrameButton" class="focus-button" type="button">◀ 前へ</button>
             <!-- 最大表示のまま全STEPを連続再生します。 -->
-            <button id="focusPlayButton" class="focus-button primary" type="button">▶ 連続</button>
+            <button id="focusPlayButton" class="focus-button primary" type="button">▶ 再生</button>
             <!-- 次の動作またはSTEPへ進みます。 -->
             <button id="focusNextFrameButton" class="focus-button" type="button">次へ ▶</button>
+          </div>
+          <!-- 最大表示中の再生ボタンとSTEP一覧を薄いアイコンで開閉します。 -->
+          <div class="focus-visibility-controls" aria-label="最大表示中の表示切替">
+            <button id="focusPlayVisibilityButton" class="focus-visibility-button active" type="button" aria-pressed="true" title="再生ボタンを隠す">▶</button>
+            <button id="focusStepsVisibilityButton" class="focus-visibility-button active" type="button" aria-pressed="true" title="STEP一覧を隠す">≡</button>
           </div>
           <!-- 最大表示中のSTEP一覧です。 -->
           <div id="focusStepList" class="focus-step-list" aria-label="最大表示中の作戦ステップ"></div>
@@ -209,11 +214,11 @@
           <div id="stepList" class="step-list" aria-label="作戦ステップ"></div>
           <!-- STEPの追加・削除・再生を行います。 -->
           <div class="step-actions">
-            <button id="addStepButton" class="button" type="button">＋ STEP複製</button>
+            <button id="addStepButton" class="button" type="button">＋ 複製</button>
             <button id="deleteStepButton" class="button danger" type="button">削除</button>
             <button id="previousFrameButton" class="button" type="button">◀ 前へ</button>
             <button id="nextFrameButton" class="button" type="button">次へ ▶</button>
-            <button id="playStepsButton" class="button primary" type="button">▶ 連続再生</button>
+            <button id="playStepsButton" class="button primary" type="button">▶ 再生</button>
           </div>
         </div>
       </section>
@@ -256,40 +261,45 @@
             <span>移動線を表示</span>
             <input id="showMovementLinesToggle" type="checkbox" checked />
           </label>
-          <!-- 最大表示中の再生ボタンを切り替えます。 -->
-          <label class="switch-row" for="focusPlayToggle">
-            <span>最大化時：再生ボタン</span>
-            <input id="focusPlayToggle" type="checkbox" checked />
-          </label>
-          <!-- 最大表示中のSTEP一覧を切り替えます。 -->
-          <label class="switch-row" for="focusStepsToggle">
-            <span>最大化時：STEP一覧</span>
-            <input id="focusStepsToggle" type="checkbox" checked />
-          </label>
         </section>
-        <!-- オフェンスとディフェンスの背番号マーカーを0番から18番まで切り替えます。 -->
-        <section class="panel-card player-manager-card">
+        <!-- オフェンスとディフェンスの人数を簡単に増減し、必要な時だけ全番号を表示します。 -->
+        <section class="panel-card player-manager-card" title="全番号を開くと、番号を押して現在STEPへ追加・削除できます。">
           <div class="player-manager-header">
-            <div>
-              <h2>選手番号</h2>
-              <p>番号を押すと、現在STEPへ追加・削除します。</p>
+            <h2>選手</h2>
+            <button id="playerNumberDetailsToggle" class="button compact number-details-toggle" type="button" aria-expanded="false" title="全番号を表示">123 全番号</button>
+          </div>
+          <div class="player-count-row offense">
+            <span class="player-count-label">オフェンス</span>
+            <div class="player-count-control" role="group" aria-label="オフェンス人数">
+              <button type="button" data-player-count-side="offense" data-player-count-change="1" title="オフェンスを1人追加">＋</button>
+              <output id="offensePlayerCount">0</output>
+              <button type="button" data-player-count-side="offense" data-player-count-change="-1" title="オフェンスを1人削除">−</button>
             </div>
           </div>
-          <div class="player-number-section offense">
-            <span class="player-number-title">オフェンス 0〜18</span>
-            <div id="offenseNumberGrid" class="player-number-grid" aria-label="オフェンス選手番号"></div>
+          <div class="player-count-row defense">
+            <span class="player-count-label">ディフェンス</span>
+            <div class="player-count-control" role="group" aria-label="ディフェンス人数">
+              <button type="button" data-player-count-side="defense" data-player-count-change="1" title="ディフェンスを1人追加">＋</button>
+              <output id="defensePlayerCount">0</output>
+              <button type="button" data-player-count-side="defense" data-player-count-change="-1" title="ディフェンスを1人削除">−</button>
+            </div>
           </div>
-          <div class="player-number-section defense">
-            <span class="player-number-title">ディフェンス 0〜18</span>
-            <div id="defenseNumberGrid" class="player-number-grid" aria-label="ディフェンス選手番号"></div>
+          <div id="playerNumberDetails" class="player-number-details hidden">
+            <div class="player-number-section offense">
+              <span class="player-number-title">オフェンス 0〜18</span>
+              <div id="offenseNumberGrid" class="player-number-grid" aria-label="オフェンス選手番号"></div>
+            </div>
+            <div class="player-number-section defense">
+              <span class="player-number-title">ディフェンス 0〜18</span>
+              <div id="defenseNumberGrid" class="player-number-grid" aria-label="ディフェンス選手番号"></div>
+            </div>
           </div>
         </section>
         <!-- 練習用コーンを赤と青で追加します。 -->
-        <section class="panel-card cone-manager-card">
+        <section class="panel-card cone-manager-card" title="追加後は選択で移動、消すで削除できます。">
           <div class="cone-manager-header">
             <div>
               <h2>コーン</h2>
-              <p>追加後は選択で移動、消すで削除できます。</p>
             </div>
           </div>
           <div class="cone-actions">
@@ -298,26 +308,14 @@
           </div>
         </section>
         <!-- STEP内の動作順を設定します。 -->
-        <section class="panel-card action-order-card">
+        <section class="panel-card action-order-card" title="同じ番号の移動・スクリーンは同時再生。パスとドリブルは描画順です。">
           <div class="action-order-header">
             <div>
               <h2>動作順</h2>
-              <p>同じ番号の移動・スクリーンは同時再生。パスとドリブルは描画順です。</p>
             </div>
             <button id="resetActionOrderButton" class="button compact" type="button">初期値</button>
           </div>
           <div id="actionOrderList" class="action-order-list" aria-label="現在STEPの動作順"></div>
-        </section>
-        <!-- 凡例を表示します。 -->
-        <section class="panel-card">
-          <h2>凡例</h2>
-          <div class="legend-row"><span class="legend-line solid"></span><span>選手の移動</span></div>
-          <div class="legend-row"><span class="legend-line dashed"></span><span>パス</span></div>
-          <div class="legend-row"><span class="legend-line wavy">〰</span><span>ドリブル（曲線／直線）</span></div>
-          <div class="legend-row"><span class="legend-line screen">⊥</span><span>スクリーン移動（曲線／直線）</span></div>
-          <div class="legend-row"><span class="legend-line free">✎</span><span>自由線</span></div>
-          <div class="legend-row"><span class="legend-line free">T</span><span>テキスト（選択で移動・ダブルクリックで編集）</span></div>
-          <div class="legend-row"><span class="legend-line cone">▲</span><span>赤・青コーン（選択で移動）</span></div>
         </section>
         <!-- コーチングポイントを入力します。 -->
         <section class="panel-card note-card">
@@ -454,6 +452,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=24"></script>
+  <script defer src="./1_App/js/app.js?v=25"></script>
 </body>
 </html>

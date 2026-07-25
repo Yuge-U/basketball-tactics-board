@@ -1,1 +1,1 @@
-Basketball Tactics Board v24 - Single-row board controls / legacy default migration / icon-only tools
+Basketball Tactics Board v25 - Fullscreen display toggles / compact player controls / throw-in court margin
