@@ -1,1 +1,1 @@
-Basketball Tactics Board v23 - Compact responsive UI / offense-only reset / improved basketball marker
+Basketball Tactics Board v24 - Single-row board controls / legacy default migration / icon-only tools

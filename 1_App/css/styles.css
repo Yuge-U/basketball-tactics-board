@@ -179,7 +179,7 @@ button {
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr) 260px;
+  grid-template-columns: 70px minmax(0, 1fr) 260px;
   gap: 14px;
   padding: 14px;
   min-height: 0;
@@ -190,8 +190,8 @@ button {
 .tool-panel {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 4px;
+  padding: 6px;
   border: 1px solid #e5e7eb;
   border-radius: 16px;
   background: var(--surface);
@@ -201,12 +201,12 @@ button {
 
 /* 各ツールボタンを縦型にします。 */
 .tool-button {
-  min-height: 68px;
+  min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0;
   border: 1px solid transparent;
   border-radius: 12px;
   color: var(--muted);
@@ -219,6 +219,11 @@ button {
 .tool-icon {
   font-size: 24px;
   line-height: 1;
+}
+
+/* 左ツールはアイコンだけを表示し、説明はtitle属性へ残します。 */
+.tool-button > span:not(.tool-icon) {
+  display: none;
 }
 
 /* 選択中ツールの見た目です。 */
@@ -242,12 +247,15 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
 }
 
 /* コート切替の外枠です。 */
 .segmented {
   display: inline-flex;
+  flex-shrink: 0;
   padding: 3px;
   border: 1px solid var(--line);
   border-radius: 11px;
@@ -263,6 +271,7 @@ button {
   color: var(--muted);
   background: transparent;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* 選択中コートの見た目です。 */
@@ -286,7 +295,8 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 /* 正方形のアイコンボタンです。 */
@@ -1511,6 +1521,37 @@ body.board-focus .focus-controls {
     scrollbar-width: thin;
     padding-bottom: 2px;
   }
+
+  .board-controls {
+    justify-content: flex-start;
+    gap: 5px;
+  }
+
+  .status-pill {
+    display: none;
+  }
+
+  .history-actions {
+    gap: 4px;
+  }
+
+  .segment {
+    min-height: 30px;
+    padding: 4px 9px;
+    font-size: 12px;
+  }
+
+  .history-actions .icon-button {
+    width: 34px;
+    height: 34px;
+    font-size: 18px;
+  }
+
+  .history-actions .button.compact {
+    min-height: 34px;
+    padding: 5px 7px;
+    font-size: 11px;
+  }
 }
 
 /* デスクトップでは長い設定パネルだけを内部スクロールへ切り替えます。 */
@@ -1542,7 +1583,7 @@ body.board-focus .focus-controls {
   }
 
   .tool-button {
-    min-height: 50px;
+    min-height: 44px;
     gap: 2px;
     font-size: 11px;
   }
@@ -1596,6 +1637,10 @@ body.board-focus .focus-controls {
 
   .play-meta-inline {
     display: flex;
+  }
+
+  .tool-button {
+    min-height: 48px;
   }
 }
 
