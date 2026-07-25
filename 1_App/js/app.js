@@ -389,12 +389,7 @@ function createDefaultStep(number, size) {
       { id: "o2", side: "offense", label: "2", x: width * 0.24, y: height * 0.65 },
       { id: "o3", side: "offense", label: "3", x: width * 0.76, y: height * 0.65 },
       { id: "o4", side: "offense", label: "4", x: width * 0.35, y: height * 0.36 },
-      { id: "o5", side: "offense", label: "5", x: width * 0.65, y: height * 0.36 },
-      { id: "d1", side: "defense", label: "1", x: width * 0.5, y: height * 0.66 },
-      { id: "d2", side: "defense", label: "2", x: width * 0.27, y: height * 0.54 },
-      { id: "d3", side: "defense", label: "3", x: width * 0.73, y: height * 0.54 },
-      { id: "d4", side: "defense", label: "4", x: width * 0.39, y: height * 0.27 },
-      { id: "d5", side: "defense", label: "5", x: width * 0.61, y: height * 0.27 }
+      { id: "o5", side: "offense", label: "5", x: width * 0.65, y: height * 0.36 }
     ],
     ball: { id: "ball", x: width * 0.54, y: height * 0.78 },
     cones: [],
@@ -718,7 +713,7 @@ function resizeCanvas() {
     // Canvas上端から画面下端までの高さを取得します。
     const top = canvasShell.getBoundingClientRect().top;
     // STEP操作分を少し残しながら使える高さを計算します。
-    const availableHeight = Math.max(420, window.innerHeight - top - 24);
+    const availableHeight = Math.max(300, window.innerHeight - top - 70);
     // 横幅と高さの両方へ収まる表示幅を計算します。
     const fittedWidth = Math.min(availableWidth, availableHeight * courtRatio);
     // 計算した幅を設定します。
@@ -1374,12 +1369,26 @@ function drawPlayer(ctx, player, isActive = false) {
 
 // ボールを描きます。
 function drawBall(ctx, ball) {
+  // ボール以外の描画設定へ影響しないように現在状態を保存します。
+  ctx.save();
+  // 左上に明るさを置いたグラデーションでボールの丸みを表現します。
+  const ballFill = ctx.createRadialGradient(
+    ball.x - BALL_RADIUS * 0.36,
+    ball.y - BALL_RADIUS * 0.42,
+    BALL_RADIUS * 0.08,
+    ball.x,
+    ball.y,
+    BALL_RADIUS * 1.08
+  );
+  ballFill.addColorStop(0, "#fdba74");
+  ballFill.addColorStop(0.48, "#f97316");
+  ballFill.addColorStop(1, "#c2410c");
   // ボールの塗り色を設定します。
-  ctx.fillStyle = "#f97316";
+  ctx.fillStyle = ballFill;
   // ボールの枠色を設定します。
-  ctx.strokeStyle = "#7c2d12";
+  ctx.strokeStyle = "#431407";
   // ボールの枠を設定します。
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.6;
   // ボール円を開始します。
   ctx.beginPath();
   // ボール位置に円を描きます。
@@ -1388,20 +1397,48 @@ function drawBall(ctx, ball) {
   ctx.fill();
   // ボール枠を描きます。
   ctx.stroke();
-  // ボールの縫い目を描きます。
+  // 縫い目をボールの内側だけへ収めます。
+  ctx.save();
   ctx.beginPath();
-  // 縦の縫い目を描きます。
-  ctx.arc(ball.x, ball.y, BALL_RADIUS * 0.42, -Math.PI / 2, Math.PI / 2);
-  // 縫い目を描画します。
+  ctx.arc(ball.x, ball.y, BALL_RADIUS - 1.2, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.strokeStyle = "#57210f";
+  ctx.lineWidth = 1.9;
+  ctx.lineCap = "round";
+  // 中央の縦の縫い目を描きます。
+  ctx.beginPath();
+  ctx.moveTo(ball.x, ball.y - BALL_RADIUS);
+  ctx.lineTo(ball.x, ball.y + BALL_RADIUS);
   ctx.stroke();
-  // 横の縫い目を開始します。
+  // 中央の横の縫い目を描きます。
   ctx.beginPath();
-  // 左端へ移動します。
   ctx.moveTo(ball.x - BALL_RADIUS, ball.y);
-  // 右端へ進みます。
   ctx.lineTo(ball.x + BALL_RADIUS, ball.y);
-  // 横線を描画します。
   ctx.stroke();
+  // 左右の曲線でバスケットボール特有のパネル形状を描きます。
+  ctx.beginPath();
+  ctx.moveTo(ball.x, ball.y - BALL_RADIUS);
+  ctx.bezierCurveTo(
+    ball.x - BALL_RADIUS * 0.78,
+    ball.y - BALL_RADIUS * 0.62,
+    ball.x - BALL_RADIUS * 0.78,
+    ball.y + BALL_RADIUS * 0.62,
+    ball.x,
+    ball.y + BALL_RADIUS
+  );
+  ctx.moveTo(ball.x, ball.y - BALL_RADIUS);
+  ctx.bezierCurveTo(
+    ball.x + BALL_RADIUS * 0.78,
+    ball.y - BALL_RADIUS * 0.62,
+    ball.x + BALL_RADIUS * 0.78,
+    ball.y + BALL_RADIUS * 0.62,
+    ball.x,
+    ball.y + BALL_RADIUS
+  );
+  ctx.stroke();
+  ctx.restore();
+  // 描画前の設定へ戻します。
+  ctx.restore();
 }
 
 // テキストの概算幅をコート座標で計算します。
