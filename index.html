@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=33" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=34" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -151,6 +151,16 @@
           <span class="tool-icon">T</span>
           <span>テキスト</span>
         </button>
+        <!-- コートまたは外周余白へ画像を配置します。 -->
+        <button class="tool-button" type="button" data-import-media="image" aria-label="画像を取り込む" title="画像を取り込む">
+          <span class="tool-icon">▧</span>
+          <span>画像</span>
+        </button>
+        <!-- コートまたは外周余白へ動画を配置します。 -->
+        <button class="tool-button" type="button" data-import-media="video" aria-label="動画を取り込む" title="動画を取り込む">
+          <span class="tool-icon">▸</span>
+          <span>動画</span>
+        </button>
         <!-- 描画した線を消します。 -->
         <button class="tool-button" type="button" data-tool="erase" title="線を削除">
           <span class="tool-icon">⌫</span>
@@ -203,9 +213,30 @@
           <!-- 最大表示中のSTEP一覧を薄いアイコンで開閉します。 -->
           <div class="focus-visibility-controls" aria-label="最大表示中の表示切替">
             <button id="focusStepsVisibilityButton" class="focus-visibility-button" type="button" aria-pressed="false" aria-label="STEP一覧を表示" title="STEP一覧を表示">≡</button>
+            <button id="focusPlaybackSettingsButton" class="focus-visibility-button" type="button" aria-pressed="false" aria-label="再生設定を表示" title="再生設定を表示">⚙</button>
           </div>
           <!-- 最大表示中のSTEP一覧です。 -->
           <div id="focusStepList" class="focus-step-list" aria-label="最大表示中の作戦ステップ"></div>
+          <!-- 最大表示中の動作順・速度・移動線設定です。 -->
+          <div id="focusPlaybackSettingsPanel" class="focus-playback-settings-panel" aria-label="最大表示中の再生設定">
+            <div class="focus-settings-heading">
+              <strong>再生設定</strong>
+              <button id="focusResetActionOrderButton" class="focus-mini-button" type="button" aria-label="動作順を初期値へ戻す" title="動作順を初期値へ戻す">↺</button>
+            </div>
+            <div class="focus-speed-setting">
+              <label for="focusMovementSpeedRange"><span>移動速度</span><output id="focusMovementSpeedValue">1.00×</output></label>
+              <input id="focusMovementSpeedRange" type="range" min="0.5" max="2" step="0.25" value="1" />
+            </div>
+            <div class="focus-speed-setting">
+              <label for="focusPlaybackSpeedRange"><span>連続再生速度</span><output id="focusPlaybackSpeedValue">1.00×</output></label>
+              <input id="focusPlaybackSpeedRange" type="range" min="0.5" max="2" step="0.25" value="1" />
+            </div>
+            <label class="focus-switch-row" for="focusShowMovementLinesToggle">
+              <span>移動線を表示</span>
+              <input id="focusShowMovementLinesToggle" type="checkbox" checked />
+            </label>
+            <div id="focusActionOrderList" class="action-order-list focus-action-order-list" aria-label="最大表示中の動作順"></div>
+          </div>
           <!-- 最大表示中の編集ツールを表示します。 -->
           <div id="focusEditorPanel" class="focus-editor-panel" aria-label="最大表示中の編集ツール">
             <!-- 最大表示中でも選択・描画ツールを切り替えられます。 -->
@@ -219,6 +250,8 @@
               <button class="focus-tool-button" type="button" data-tool="screenStraight" title="スクリーン直線">→⊥</button>
               <button class="focus-tool-button" type="button" data-tool="free" title="自由線">✎</button>
               <button class="focus-tool-button" type="button" data-tool="text" title="テキスト">T</button>
+              <button class="focus-tool-button" type="button" data-import-media="image" aria-label="画像を取り込む" title="画像を取り込む">▧</button>
+              <button class="focus-tool-button" type="button" data-import-media="video" aria-label="動画を取り込む" title="動画を取り込む">▸</button>
               <button class="focus-tool-button cone-red" type="button" data-add-cone="red" title="赤コーンを追加">▲</button>
               <button class="focus-tool-button cone-blue" type="button" data-add-cone="blue" title="青コーンを追加">▲</button>
               <button class="focus-tool-button" type="button" data-tool="erase" title="線・テキスト・コーンを削除">⌫</button>
@@ -230,6 +263,17 @@
               <button class="focus-color-button blue" type="button" data-line-color="blue" aria-label="青"></button>
               <button id="focusUndoButton" class="focus-mini-button" type="button" title="元に戻す">↶</button>
               <button id="focusRedoButton" class="focus-mini-button" type="button" title="やり直す">↷</button>
+            </div>
+            <!-- 最大表示中も選手とボールのサイズを変更します。 -->
+            <div class="focus-size-controls">
+              <span>選手</span>
+              <button type="button" data-player-size="large" title="選手サイズ 大">大</button>
+              <button class="active" type="button" data-player-size="medium" title="選手サイズ 中">中</button>
+              <button type="button" data-player-size="small" title="選手サイズ 小">小</button>
+              <span>ボール</span>
+              <button type="button" data-ball-size="large" title="ボールサイズ 大">大</button>
+              <button class="active" type="button" data-ball-size="medium" title="ボールサイズ 中">中</button>
+              <button type="button" data-ball-size="small" title="ボールサイズ 小">小</button>
             </div>
           </div>
           <!-- 右下の薄いボタンで最大表示中の編集ツールを開閉します。 -->
@@ -269,9 +313,18 @@
           <div class="setting-group">
             <span class="setting-label">選手サイズ</span>
             <div class="player-size-selector" role="group" aria-label="選手サイズ">
-              <button class="player-size-button active" type="button" data-player-size="large" aria-label="大" title="大">大</button>
-              <button class="player-size-button" type="button" data-player-size="medium" aria-label="中" title="中">中</button>
+              <button class="player-size-button" type="button" data-player-size="large" aria-label="大" title="大">大</button>
+              <button class="player-size-button active" type="button" data-player-size="medium" aria-label="中" title="中">中</button>
               <button class="player-size-button" type="button" data-player-size="small" aria-label="小" title="小">小</button>
+            </div>
+          </div>
+          <!-- コート上のボールサイズを切り替えます。 -->
+          <div class="setting-group">
+            <span class="setting-label">ボールサイズ</span>
+            <div class="player-size-selector" role="group" aria-label="ボールサイズ">
+              <button class="player-size-button" type="button" data-ball-size="large" aria-label="大" title="大">大</button>
+              <button class="player-size-button active" type="button" data-ball-size="medium" aria-label="中" title="中">中</button>
+              <button class="player-size-button" type="button" data-ball-size="small" aria-label="小" title="小">小</button>
             </div>
           </div>
           <!-- 選手とボールが線上を移動する速度を調整します。 -->
@@ -345,13 +398,11 @@
           </div>
           <div id="actionOrderList" class="action-order-list" aria-label="現在STEPの動作順"></div>
         </section>
-        <!-- コーチングポイントを入力します。 -->
-        <section class="panel-card note-card">
-          <label for="stepNote">コーチングポイント</label>
-          <textarea id="stepNote" rows="8" placeholder="例：5番がスクリーン後にダイブ。1番はヘルプの位置を見て判断する。"></textarea>
-        </section>
       </aside>
     </section>
+    <!-- 画像・動画を取り込む非表示のファイル選択欄です。 -->
+    <input id="imageImportInput" type="file" accept="image/*" hidden />
+    <input id="videoImportInput" type="file" accept="video/*" hidden />
   </main>
 
   <!-- 保存済み作戦一覧のダイアログです。 -->
@@ -472,6 +523,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=33"></script>
+  <script defer src="./1_App/js/app.js?v=34"></script>
 </body>
 </html>

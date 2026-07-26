@@ -1257,8 +1257,93 @@ body.board-focus .canvas-hint {
 
 /* 最大表示中の編集パネルは通常表示では隠します。 */
 .focus-editor-panel,
-.focus-editor-toggle {
+.focus-editor-toggle,
+.focus-playback-settings-panel {
   display: none;
+}
+
+/* 最大表示中の動作順・速度・移動線設定を左下へ重ねます。 */
+body.board-focus .focus-playback-settings-panel {
+  position: absolute;
+  left: 18px;
+  bottom: 64px;
+  z-index: 18;
+  width: min(360px, calc(100vw - 36px));
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 16px;
+  color: #ffffff;
+  background: rgba(17, 24, 39, 0.78);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+body.board-focus .focus-playback-settings-panel.open {
+  display: grid;
+  gap: 10px;
+}
+
+.focus-settings-heading,
+.focus-speed-setting label,
+.focus-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.focus-speed-setting {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.focus-speed-setting input[type="range"] {
+  width: 100%;
+  accent-color: #60a5fa;
+}
+
+.focus-speed-setting output {
+  color: #bfdbfe;
+  font-weight: 800;
+}
+
+.focus-switch-row {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.focus-switch-row input {
+  width: 20px;
+  height: 20px;
+  accent-color: #2563eb;
+}
+
+.focus-action-order-list {
+  max-height: min(280px, 34dvh);
+  overflow-y: auto;
+}
+
+.focus-action-order-list .action-order-row {
+  grid-template-columns: minmax(0, 1fr) 52px 32px;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.action-order-focus-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focus-action-order-list .action-order-empty {
+  color: rgba(255, 255, 255, 0.68);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* 最大表示中の編集パネルを右下へ配置します。 */
@@ -1316,6 +1401,34 @@ body.board-focus .focus-editor-panel.open {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* 最大表示編集パネル内の選手・ボールサイズを小さくまとめます。 */
+.focus-size-controls {
+  display: grid;
+  grid-template-columns: auto repeat(3, 34px);
+  align-items: center;
+  gap: 6px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.focus-size-controls button {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 8px;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.focus-size-controls button.active {
+  border-color: #93c5fd;
+  color: #1e3a8a;
+  background: #dbeafe;
 }
 
 /* 最大表示中の色選択ボタンです。 */
@@ -1391,6 +1504,12 @@ body.board-focus .focus-editor-toggle.open {
     right: 10px;
     bottom: 62px;
     width: min(300px, calc(100vw - 20px));
+  }
+
+  body.board-focus .focus-playback-settings-panel {
+    left: 10px;
+    bottom: 58px;
+    width: min(320px, calc(100vw - 20px));
   }
 
   body.board-focus .focus-editor-toggle {
