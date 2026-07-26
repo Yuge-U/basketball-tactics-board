@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=36" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=37" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -256,11 +256,11 @@
               <button class="focus-tool-button cone-blue" type="button" data-add-cone="blue" title="青コーンを追加">▲</button>
               <button class="focus-tool-button" type="button" data-tool="erase" title="線・テキスト・コーンを削除">⌫</button>
             </div>
-            <!-- 最大表示中の線色を選択します。 -->
-            <div class="focus-editor-colors" role="group" aria-label="最大表示中の線色">
-              <button class="focus-color-button active" type="button" data-line-color="black" aria-label="黒"></button>
-              <button class="focus-color-button red" type="button" data-line-color="red" aria-label="赤"></button>
-              <button class="focus-color-button blue" type="button" data-line-color="blue" aria-label="青"></button>
+            <!-- 最大表示中の線・文字色を選択します。 -->
+            <div class="focus-editor-colors" role="group" aria-label="最大表示中の線・文字色">
+              <button class="focus-color-button active" type="button" data-line-color="black" aria-label="黒" title="黒（選択中テキストにも反映）"></button>
+              <button class="focus-color-button red" type="button" data-line-color="red" aria-label="赤" title="赤（選択中テキストにも反映）"></button>
+              <button class="focus-color-button blue" type="button" data-line-color="blue" aria-label="青" title="青（選択中テキストにも反映）"></button>
               <button id="focusUndoButton" class="focus-mini-button" type="button" title="元に戻す">↶</button>
               <button id="focusRedoButton" class="focus-mini-button" type="button" title="やり直す">↷</button>
             </div>
@@ -276,6 +276,14 @@
                 <option value="handwritten">手書き風</option>
               </select>
             </label>
+            <!-- 最大表示中も配置テキストの縁取りを切り替えます。 -->
+            <div class="focus-outline-control">
+              <span>文字の縁</span>
+              <div class="text-outline-selector" role="group" aria-label="テキストの縁取り">
+                <button type="button" data-text-outline="false" aria-pressed="false" title="文字の縁なし">なし</button>
+                <button class="active" type="button" data-text-outline="true" aria-pressed="true" title="文字の縁あり">あり</button>
+              </div>
+            </div>
             <!-- 最大表示中も選手とボールのサイズを変更します。 -->
             <div class="focus-size-controls">
               <span>選手</span>
@@ -312,13 +320,13 @@
         <!-- 線色と表示方法を設定します。 -->
         <section class="panel-card display-settings">
           <h2>描画・表示設定</h2>
-          <!-- 新しく描く線の色を選択します。 -->
+          <!-- 新しく描く線・文字と選択中テキストの色を選択します。 -->
           <div class="setting-group">
-            <span class="setting-label">線の色</span>
-            <div class="color-selector" role="group" aria-label="線の色">
-              <button class="color-button active" type="button" data-line-color="black" aria-label="黒" title="黒"></button>
-              <button class="color-button red" type="button" data-line-color="red" aria-label="赤" title="赤"></button>
-              <button class="color-button blue" type="button" data-line-color="blue" aria-label="青" title="青"></button>
+            <span class="setting-label">線・文字の色</span>
+            <div class="color-selector" role="group" aria-label="線・文字の色">
+              <button class="color-button active" type="button" data-line-color="black" aria-label="黒" title="黒（選択中テキストにも反映）"></button>
+              <button class="color-button red" type="button" data-line-color="red" aria-label="赤" title="赤（選択中テキストにも反映）"></button>
+              <button class="color-button blue" type="button" data-line-color="blue" aria-label="青" title="青（選択中テキストにも反映）"></button>
             </div>
           </div>
           <!-- 配置するテキストのフォントを選択します。 -->
@@ -333,6 +341,14 @@
               <option value="handwritten">手書き風</option>
             </select>
           </label>
+          <!-- 配置するテキストと選択中テキストの縁取りを切り替えます。 -->
+          <div class="setting-group">
+            <span class="setting-label">文字の縁</span>
+            <div class="text-outline-selector" role="group" aria-label="テキストの縁取り">
+              <button type="button" data-text-outline="false" aria-pressed="false" title="文字の縁なし">なし</button>
+              <button class="active" type="button" data-text-outline="true" aria-pressed="true" title="文字の縁あり">あり</button>
+            </div>
+          </div>
           <!-- コート上の選手マーカーサイズを切り替えます。 -->
           <div class="setting-group">
             <span class="setting-label">選手サイズ</span>
@@ -547,6 +563,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=35"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=36"></script>
+  <script defer src="./1_App/js/app.js?v=37"></script>
 </body>
 </html>

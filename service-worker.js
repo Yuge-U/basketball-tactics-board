@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v36-outer-workspace-fonts";
+const CACHE_NAME = "basketball-tactics-board-v37-text-color-outline";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

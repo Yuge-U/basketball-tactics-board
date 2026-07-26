@@ -1,1 +1,1 @@
-Basketball Tactics Board v36 - Persistent outer workspace and text fonts
+Basketball Tactics Board v37 - Editable text color and outline

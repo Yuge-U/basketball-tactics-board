@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 14;
+const SCHEMA_VERSION = 15;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -776,6 +776,7 @@ function createInitialState() {
     activeTool: "select",
     activeLineColor: "black",
     activeTextFont: "gothic",
+    activeTextOutline: true,
     playerSize: "medium",
     ballSize: "medium",
     movementSpeed: 1,
@@ -854,6 +855,8 @@ function createSnapshot() {
     activeLineColor: state.activeLineColor,
     // 新しく配置するテキストのフォントを保存します。
     activeTextFont: state.activeTextFont,
+    // 新しく配置するテキストの縁取り設定を保存します。
+    activeTextOutline: state.activeTextOutline,
     // 選手マーカーの表示サイズを保存します。
     playerSize: state.playerSize,
     // ボールの表示サイズを保存します。
@@ -974,6 +977,8 @@ function migrateSnapshot(snapshot) {
       textItem.fontSize = Number.isFinite(Number(textItem.fontSize)) ? Number(textItem.fontSize) : TEXT_FONT_SIZE;
       // 旧版テキストには標準のゴシックを設定します。
       textItem.font = normalizeTextFont(textItem.font);
+      // 旧版と未設定のテキストは従来どおり縁ありにします。
+      textItem.outline = textItem.outline !== false;
       // 拡大率と回転角を補います。
       textItem.scale = Math.max(0.25, Math.min(5, Number(textItem.scale) || 1));
       textItem.rotation = Number(textItem.rotation) || 0;
@@ -1022,6 +1027,8 @@ function migrateSnapshot(snapshot) {
   migrated.activeLineColor = LINE_COLORS[migrated.activeLineColor] ? migrated.activeLineColor : "black";
   // 新しく配置するテキストのフォントを補正します。
   migrated.activeTextFont = normalizeTextFont(migrated.activeTextFont);
+  // 新しく配置するテキストの縁取り設定を補います。
+  migrated.activeTextOutline = migrated.activeTextOutline !== false;
   // 選手マーカーサイズを補正し、未設定データは標準の中へ設定します。
   migrated.playerSize = normalizePlayerSize(migrated.playerSize);
   // ボールサイズを補正し、未設定データは新しい標準の中へ設定します。
@@ -1067,6 +1074,8 @@ function applySnapshot(snapshot) {
   state.activeLineColor = migrated.activeLineColor ?? "black";
   // 新しく配置するテキストのフォントを復元します。
   state.activeTextFont = normalizeTextFont(migrated.activeTextFont);
+  // 新しく配置するテキストの縁取り設定を復元します。
+  state.activeTextOutline = migrated.activeTextOutline !== false;
   // 選手マーカーの表示サイズを復元します。
   state.playerSize = normalizePlayerSize(migrated.playerSize);
   // ボールの表示サイズを復元します。
@@ -1980,14 +1989,13 @@ function drawCourtText(ctx, textItem) {
   ctx.textAlign = "center";
   // 文字を縦方向も中央基準で配置します。
   ctx.textBaseline = "middle";
-  // 木目上でも読める白い縁取りを設定します。
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
-  // 縁取りを見やすい太さにします。
-  ctx.lineWidth = Math.max(5, fontSize * 0.22);
-  // 角を滑らかにつなぎます。
-  ctx.lineJoin = "round";
-  // テキストの白い縁取りを描きます。
-  ctx.strokeText(String(textItem.text ?? ""), 0, 0);
+  // 縁ありを選んだテキストだけ、木目上でも読める白い縁取りを描きます。
+  if (textItem.outline !== false) {
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.lineWidth = Math.max(5, fontSize * 0.22);
+    ctx.lineJoin = "round";
+    ctx.strokeText(String(textItem.text ?? ""), 0, 0);
+  }
   // 選択した線色と同じ文字色を設定します。
   ctx.fillStyle = LINE_COLORS[textItem.color] ?? LINE_COLORS.black;
   // テキスト本体を描きます。
@@ -2847,8 +2855,12 @@ function handlePointerDown(event) {
       const canvasItem = getSelectedCanvasItem(target);
       // 選択したテキストのフォントを設定欄へ反映します。
       if (target.type === "text" && canvasItem) {
+        state.activeLineColor = LINE_COLORS[canvasItem.color] ? canvasItem.color : "black";
         state.activeTextFont = normalizeTextFont(canvasItem.font);
+        state.activeTextOutline = canvasItem.outline !== false;
+        syncLineColorButtons();
         syncTextFontSelectors();
+        syncTextOutlineButtons();
       }
       const itemSize = canvasItem ? getCanvasItemSize(target, canvasItem) : null;
       // ドラッグ前の状態を保存します。
@@ -2957,7 +2969,7 @@ function handlePointerDown(event) {
     // キャンセルまたは空文字の場合は追加しません。
     if (enteredText !== null && enteredText.trim()) {
       // 新しいテキストデータを仮作成します。
-      const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, font: normalizeTextFont(state.activeTextFont), fontSize: TEXT_FONT_SIZE, scale: 1, rotation: 0 };
+      const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, font: normalizeTextFont(state.activeTextFont), outline: state.activeTextOutline !== false, fontSize: TEXT_FONT_SIZE, scale: 1, rotation: 0 };
       // テキスト全体がコート内へ収まる位置を計算します。
       const position = clampTextPosition(textItem, rawPoint);
       // 履歴付きでテキストを追加します。
@@ -3297,17 +3309,30 @@ function pathLength(points) {
   return total;
 }
 
-// 新しく描く線の色を切り替えます。
-function setLineColor(colorName) {
-  // 未対応の色は黒へ戻します。
-  const safeColor = LINE_COLORS[colorName] ? colorName : "black";
-  // 選択色を状態へ保存します。
-  state.activeLineColor = safeColor;
-  // 色ボタンの選択状態を更新します。
+// 通常表示と最大表示の色ボタンを同期します。
+function syncLineColorButtons() {
+  const safeColor = LINE_COLORS[state.activeLineColor] ? state.activeLineColor : "black";
   document.querySelectorAll("[data-line-color]").forEach((button) => {
-    // 選択中の色だけactiveにします。
     button.classList.toggle("active", button.dataset.lineColor === safeColor);
   });
+}
+
+// 新しく描く線・テキスト、または選択中テキストの色を切り替えます。
+function setLineColor(colorName, applyToSelectedText = false) {
+  // 未対応の色は黒へ戻します。
+  const safeColor = LINE_COLORS[colorName] ? colorName : "black";
+  const selectedText = applyToSelectedText && selectedCanvasItem?.type === "text" ? getSelectedCanvasItem() : null;
+  const before = selectedText && selectedText.color !== safeColor ? createSnapshot() : null;
+  // 選択色を状態へ保存します。
+  state.activeLineColor = safeColor;
+  if (before && selectedText) {
+    pushUndo(before);
+    selectedText.color = safeColor;
+    syncInterface();
+    return;
+  }
+  syncLineColorButtons();
+  render();
   // 設定を自動保存します。
   autosave();
 }
@@ -3333,6 +3358,33 @@ function setTextFont(fontName) {
     return;
   }
   syncTextFontSelectors();
+  render();
+  autosave();
+}
+
+// 通常表示と最大表示の文字縁取りボタンを同期します。
+function syncTextOutlineButtons() {
+  const outlineEnabled = state.activeTextOutline !== false;
+  document.querySelectorAll("[data-text-outline]").forEach((button) => {
+    const isActive = (button.dataset.textOutline === "true") === outlineEnabled;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+// 新しく配置するテキスト、または選択中テキストの縁取りを変更します。
+function setTextOutline(outlineValue) {
+  const outlineEnabled = outlineValue === true || outlineValue === "true";
+  const selectedText = selectedCanvasItem?.type === "text" ? getSelectedCanvasItem() : null;
+  const before = selectedText && (selectedText.outline !== false) !== outlineEnabled ? createSnapshot() : null;
+  state.activeTextOutline = outlineEnabled;
+  if (before && selectedText) {
+    pushUndo(before);
+    selectedText.outline = outlineEnabled;
+    syncInterface();
+    return;
+  }
+  syncTextOutlineButtons();
   render();
   autosave();
 }
@@ -5658,6 +5710,8 @@ function syncInterface(save = true) {
   setLineColor(state.activeLineColor);
   // テキストのフォント選択欄を同期します。
   syncTextFontSelectors();
+  // テキストの縁取り設定を同期します。
+  syncTextOutlineButtons();
   // 移動速度設定を同期します。
   movementSpeedRange.value = String(normalizeSpeed(state.movementSpeed));
   // 移動速度の数値を同期します。
@@ -5763,12 +5817,17 @@ document.querySelectorAll("[data-tool]").forEach((button) => {
 // 線色ボタンへイベントを登録します。
 document.querySelectorAll("[data-line-color]").forEach((button) => {
   // クリック時に対応色へ切り替えます。
-  button.addEventListener("click", () => setLineColor(button.dataset.lineColor));
+  button.addEventListener("click", () => setLineColor(button.dataset.lineColor, true));
 });
 
 // 通常表示と最大表示のフォント選択欄へイベントを登録します。
 document.querySelectorAll("[data-text-font-select]").forEach((select) => {
   select.addEventListener("change", () => setTextFont(select.value));
+});
+
+// 通常表示と最大表示の文字縁取りボタンへイベントを登録します。
+document.querySelectorAll("[data-text-outline]").forEach((button) => {
+  button.addEventListener("click", () => setTextOutline(button.dataset.textOutline));
 });
 
 // 選手サイズボタンへイベントを登録します。
