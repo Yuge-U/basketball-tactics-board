@@ -42,6 +42,11 @@ textarea {
   font: inherit;
 }
 
+/* hidden属性は既存のbutton/display指定より常に優先します。 */
+[hidden] {
+  display: none !important;
+}
+
 /* ボタンの標準カーソルを設定します。 */
 button {
   cursor: pointer;
@@ -1991,7 +1996,7 @@ body.board-focus .focus-controls {
 
 /* OneDrive設定ダイアログの内容です。 */
 .onedrive-dialog {
-  width: min(720px, calc(100vw - 28px));
+  width: min(760px, calc(100vw - 28px));
 }
 
 .onedrive-content {
@@ -2071,7 +2076,8 @@ body.board-focus .focus-controls {
   font-weight: 800;
 }
 
-.onedrive-field input {
+.onedrive-field input,
+.onedrive-field select {
   width: 100%;
   min-height: 42px;
   border: 1px solid #cbd5e1;
@@ -2116,16 +2122,301 @@ body.board-focus .focus-controls {
   background: #f8fafc;
 }
 
+/* v38: 個人配布に必要な項目を既存デザインのカードへ整理します。 */
+.settings-content {
+  gap: 12px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 15px;
+  background: #ffffff;
+}
+
+.settings-section h3,
+.settings-section p {
+  margin: 0;
+}
+
+.settings-section > p {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.compact-settings-section {
+  align-items: flex-start;
+}
+
+.settings-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-status {
+  min-height: 1.5em;
+  color: #1d4ed8 !important;
+  font-weight: 700;
+  white-space: pre-line;
+}
+
+.settings-details {
+  display: block;
+}
+
+.settings-details > summary,
+.technical-details > summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.settings-details[open] > summary {
+  margin-bottom: 10px;
+}
+
+.settings-details > * + *,
+.technical-details > * + * {
+  margin-top: 10px;
+}
+
+.client-id-editor,
+.technical-details {
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.danger-soft {
+  border-color: #fecaca !important;
+  color: #b91c1c !important;
+  background: #fff7f7 !important;
+}
+
+.app-info-section p:last-child {
+  opacity: 0.72;
+}
+
+/* v38: 利用規約とガイドを全端末で画面内へ収めます。 */
+.onboarding-dialog {
+  width: min(720px, calc(100vw - 28px));
+  max-height: min(820px, calc(100dvh - 28px));
+  overflow: hidden;
+}
+
+.onboarding-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.onboarding-version {
+  margin: 12px 20px 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.terms-scroll {
+  min-height: 120px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  margin: 12px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f8fafc;
+  overscroll-behavior: contain;
+}
+
+.terms-scroll h3 {
+  margin: 18px 0 4px;
+  font-size: 15px;
+}
+
+.terms-scroll h3:first-of-type {
+  margin-top: 10px;
+}
+
+.terms-scroll p {
+  margin: 0;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.instagram-notice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 20px 12px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff7ed;
+}
+
+.instagram-notice p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #7c2d12;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.onboarding-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 0 20px 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.onboarding-checks label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 34px;
+}
+
+.onboarding-checks input {
+  width: 20px;
+  height: 20px;
+}
+
+.onboarding-dialog .dialog-actions,
+.guide-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+}
+
+.guide-page {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  padding: 26px 28px;
+  text-align: center;
+}
+
+.guide-progress {
+  align-self: flex-end;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #1d4ed8;
+  background: #dbeafe;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.guide-icon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  margin: 12px 0;
+  border-radius: 22px;
+  color: #ffffff;
+  background: #1d4ed8;
+  font-size: 36px;
+}
+
+.guide-page h3 {
+  margin: 0 0 10px;
+  font-size: 22px;
+}
+
+.guide-page p {
+  max-width: 560px;
+  margin: 0;
+  color: #475569;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
 @media (max-width: 520px) {
   .onedrive-copy-row,
   .onedrive-config-actions,
-  .onedrive-account-actions {
+  .onedrive-account-actions,
+  .settings-action-row {
     display: grid;
     grid-template-columns: 1fr;
   }
 
   .onedrive-content {
     padding: 14px;
+  }
+
+  .library-dialog,
+  .onedrive-dialog,
+  .onboarding-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+
+  .onboarding-dialog .dialog-header {
+    padding: 12px 14px;
+  }
+
+  .onboarding-dialog .dialog-header h2 {
+    font-size: 18px;
+  }
+
+  .onboarding-version,
+  .terms-scroll,
+  .instagram-notice {
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+
+  .terms-scroll {
+    padding: 12px;
+  }
+
+  .onboarding-checks {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .guide-page {
+    min-height: 240px;
+    padding: 18px 16px;
+  }
+
+  .guide-actions {
+    justify-content: stretch;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .guide-actions .button {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-right: 9px;
+    padding-left: 9px;
+  }
+}
+
+@supports (padding: max(0px)) {
+  .library-dialog {
+    margin-top: max(8px, env(safe-area-inset-top));
+    margin-right: max(8px, env(safe-area-inset-right));
+    margin-bottom: max(8px, env(safe-area-inset-bottom));
+    margin-left: max(8px, env(safe-area-inset-left));
   }
 }
 

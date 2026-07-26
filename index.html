@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=37" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=38" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -472,50 +472,169 @@
     <div id="libraryList" class="library-list"></div>
   </dialog>
 
-  <!-- 個人用OneDriveの接続設定ダイアログです。 -->
+  <!-- 個人配布版の設定ダイアログです。既存のIDを維持して呼び出し互換性を保ちます。 -->
   <dialog id="oneDriveDialog" class="library-dialog onedrive-dialog">
     <div class="dialog-header">
       <div>
-        <p class="eyebrow">PERSONAL CLOUD</p>
-        <h2>個人用OneDrive</h2>
+        <p class="eyebrow">APP SETTINGS</p>
+        <h2>設定</h2>
       </div>
       <button id="closeOneDriveButton" class="icon-button" type="button" aria-label="閉じる">×</button>
     </div>
-    <div class="onedrive-content">
-      <div id="oneDriveConnectionCard" class="onedrive-status-card" aria-live="polite">
-        <span class="onedrive-cloud-mark" aria-hidden="true">☁</span>
-        <div>
-          <strong id="oneDriveConnectionTitle">初期設定が必要です</strong>
-          <p id="oneDriveConnectionDetail">Microsoft EntraのクライアントIDを設定してください。</p>
-        </div>
-      </div>
-
-      <section class="onedrive-setup-section">
-        <h3>初回だけの設定</h3>
-        <p>Microsoft Entraで作成した「アプリケーション (クライアント) ID」を入力します。クライアントシークレットは不要です。</p>
-        <label class="onedrive-field" for="oneDriveClientId">
-          <span>クライアントID</span>
-          <input id="oneDriveClientId" type="text" inputmode="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" />
-        </label>
-        <label class="onedrive-field" for="oneDriveRedirectUri">
-          <span>Microsoft Entraへ登録するリダイレクトURI</span>
-          <div class="onedrive-copy-row">
-            <input id="oneDriveRedirectUri" type="text" readonly />
-            <button id="copyOneDriveRedirectButton" class="button compact" type="button">コピー</button>
+    <div class="onedrive-content settings-content">
+      <section class="settings-section" aria-labelledby="oneDriveSettingsTitle">
+        <h3 id="oneDriveSettingsTitle">OneDrive</h3>
+        <div id="oneDriveConnectionCard" class="onedrive-status-card" aria-live="polite">
+          <span class="onedrive-cloud-mark" aria-hidden="true">☁</span>
+          <div>
+            <strong id="oneDriveConnectionTitle">接続状態を確認中です</strong>
+            <p id="oneDriveConnectionDetail">しばらくお待ちください。</p>
           </div>
-        </label>
-        <div class="onedrive-config-actions">
-          <button id="saveOneDriveClientIdButton" class="button" type="button">IDをこの端末へ保存</button>
-          <a class="button link-button" href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer">Microsoft Entraを開く</a>
         </div>
-        <p class="onedrive-help">公開前に <code>1_App/js/onedrive-config.js</code> へ同じIDを書いておくと、PC・iPadごとのID入力は不要です。</p>
+        <div class="onedrive-account-actions">
+          <button id="connectOneDriveButton" class="button primary" type="button">Microsoftアカウントで接続</button>
+          <button id="disconnectOneDriveButton" class="button" type="button" hidden>接続を解除</button>
+        </div>
+        <p class="onedrive-privacy">作戦JSONと取り込んだ動画は、接続した本人のOneDrive内にある「アプリ」専用フォルダへ保存されます。作戦を削除しても、関連動画は誤削除を防ぐため残します。</p>
       </section>
 
-      <div class="onedrive-account-actions">
-        <button id="connectOneDriveButton" class="button primary" type="button">Microsoftアカウントで接続</button>
-        <button id="disconnectOneDriveButton" class="button" type="button" hidden>接続を解除</button>
+      <section class="settings-section" aria-labelledby="backupSettingsTitle">
+        <h3 id="backupSettingsTitle">バックアップと復元</h3>
+        <p>大切な作戦データは、定期的に一括バックアップしてください。</p>
+        <label class="onedrive-field" for="restoreConflictMode">
+          <span>同名作戦がある場合</span>
+          <select id="restoreConflictMode">
+            <option value="overwrite">上書き</option>
+            <option value="rename">別名で保存</option>
+            <option value="skip">スキップ</option>
+          </select>
+        </label>
+        <div class="settings-action-row">
+          <button id="bulkBackupButton" class="button primary" type="button">一括バックアップ</button>
+          <button id="bulkRestoreButton" class="button" type="button">一括復元</button>
+          <input id="bulkRestoreInput" type="file" accept=".json,application/json" hidden />
+        </div>
+        <p id="bulkTransferStatus" class="settings-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="settings-section compact-settings-section">
+        <h3>操作ガイド</h3>
+        <button id="openGuideButton" class="button" type="button">操作ガイドを見る</button>
+      </section>
+
+      <section class="settings-section compact-settings-section">
+        <h3>利用規約</h3>
+        <p>現在のバージョン：<strong id="currentTermsVersion">—</strong></p>
+        <p id="termsAgreementStatus">未同意</p>
+        <button id="openTermsButton" class="button" type="button">利用規約を見る</button>
+      </section>
+
+      <details class="settings-section settings-details">
+        <summary>詳細設定</summary>
+        <p>通常は変更する必要はありません。誤ったクライアントIDを設定すると、OneDriveへ接続できなくなる場合があります。</p>
+        <div class="settings-action-row">
+          <button id="changeOneDriveClientIdButton" class="button" type="button">クライアントIDを変更する</button>
+          <button id="resetOneDriveClientIdButton" class="button danger-soft" type="button">既定値へ戻す</button>
+        </div>
+        <div id="oneDriveClientIdEditor" class="client-id-editor" hidden>
+          <label class="onedrive-field" for="oneDriveClientId">
+            <span>クライアントID</span>
+            <input id="oneDriveClientId" type="text" inputmode="text" autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000" />
+          </label>
+          <div class="settings-action-row">
+            <button id="saveOneDriveClientIdButton" class="button primary" type="button">変更を確定</button>
+            <button id="cancelOneDriveClientIdButton" class="button" type="button">キャンセル</button>
+          </div>
+        </div>
+        <details class="technical-details">
+          <summary>Microsoft Entra登録情報</summary>
+          <label class="onedrive-field" for="oneDriveRedirectUri">
+            <span>リダイレクトURI</span>
+            <div class="onedrive-copy-row">
+              <input id="oneDriveRedirectUri" type="text" readonly />
+              <button id="copyOneDriveRedirectButton" class="button compact" type="button">コピー</button>
+            </div>
+          </label>
+          <a class="button link-button" href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer">Microsoft Entraを開く</a>
+        </details>
+      </details>
+
+      <section class="settings-section compact-settings-section app-info-section">
+        <h3>アプリ情報</h3>
+        <p>Basketball Tactics Board</p>
+        <p>バージョン：<strong id="currentAppVersion">—</strong></p>
+        <p>© 2026 Yuge-U. All rights reserved.</p>
+      </section>
+    </div>
+  </dialog>
+
+  <!-- 初回利用規約は同意するまで主要画面を操作できないモーダルとして表示します。 -->
+  <dialog id="termsDialog" class="library-dialog onboarding-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">TERMS OF USE</p>
+        <h2>Basketball Tactics Board 利用規約</h2>
       </div>
-      <p class="onedrive-privacy">作戦JSONと取り込んだ動画は、OneDrive内の「アプリ」専用フォルダへ保存されます。作戦を削除しても、誤削除を防ぐため関連動画はOneDriveに残します。このアプリからOneDrive内のほかのファイルへはアクセスしません。</p>
+      <button id="closeTermsButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+    </div>
+    <p class="onboarding-version">利用規約バージョン <strong id="termsDialogVersion">—</strong></p>
+    <div class="terms-scroll" tabindex="0">
+      <p>このアプリは、個人が開発し、基本無料で公開しているバスケットボール作戦作成アプリです。本アプリを利用する前に、以下の内容をご確認ください。</p>
+      <h3>1. 本アプリの利用</h3>
+      <p>本アプリは、バスケットボールの作戦作成、保存、再生、共有用データの作成を補助する目的で提供します。利用者は、自身の責任において本アプリを利用してください。</p>
+      <h3>2. 利用料金</h3>
+      <p>本アプリは、現在、基本無料で公開しています。ただし、通信費、端末費用、MicrosoftアカウントやOneDriveに関する費用などは、利用者の負担となります。将来的に提供方法や機能内容を変更する場合があります。</p>
+      <h3>3. 作戦データの保存</h3>
+      <p>作戦データは、利用者本人が接続したMicrosoftアカウントのOneDriveへ保存されます。開発者のOneDriveへ保存されるものではありません。開発者は、利用者が作成した作戦内容を閲覧しません。</p>
+      <h3>4. バックアップ</h3>
+      <p>端末、ブラウザ、OneDrive、Microsoft側の仕様変更、通信障害、操作ミスなどにより、データを読み込めなくなる可能性があります。重要な作戦データは、利用者自身で定期的に一括バックアップしてください。</p>
+      <h3>5. 動作保証</h3>
+      <p>すべての端末、OS、ブラウザ、通信環境での完全な動作を保証するものではありません。アプリやブラウザの更新、Microsoft側の仕様変更などにより、一時的に利用できなくなる可能性があります。</p>
+      <h3>6. 免責事項</h3>
+      <p>本アプリの利用または利用不能によって生じたデータ消失、不利益、損害などについて、開発者は責任を負わないものとします。ただし、適用される法令により免責が認められない場合を除きます。</p>
+      <h3>7. 禁止事項</h3>
+      <p>法令または公序良俗に反する利用、本アプリや他の利用者へ不利益を与える行為、不正アクセスや動作妨害を目的とした行為、アプリの内容を偽って再配布する行為、著作権表示を削除または改変する行為を禁止します。</p>
+      <h3>8. アプリの変更・停止</h3>
+      <p>開発者は、必要に応じて機能の追加、変更、停止、公開終了を行う場合があります。</p>
+      <h3>9. 利用規約の変更</h3>
+      <p>本規約は、必要に応じて変更する場合があります。重要な変更がある場合は、アプリ内で再度確認を求めます。</p>
+      <h3>10. お問い合わせ</h3>
+      <p>不具合や要望は、開発者のInstagramなど、アプリ内で案内する方法からご連絡ください。</p>
+    </div>
+    <aside class="instagram-notice">
+      <p>このアプリは個人で開発し、基本無料で公開しています。今後も改善を続けていくため、よろしければInstagramをフォローして応援してください。</p>
+      <strong>@yuge_u0</strong>
+      <a class="button link-button" href="https://www.instagram.com/yuge_u0/" target="_blank" rel="noopener noreferrer">Instagramを開く</a>
+    </aside>
+    <div class="onboarding-checks">
+      <label><input id="termsAcceptCheckbox" type="checkbox" /> 利用規約に同意します</label>
+      <label><input id="instagramFollowedCheckbox" type="checkbox" /> Instagramをフォローしました（任意）</label>
+    </div>
+    <div class="dialog-actions">
+      <button id="acceptTermsButton" class="button primary" type="button" disabled>同意して次へ</button>
+    </div>
+  </dialog>
+
+  <!-- 初回操作ガイドは利用規約同意後に表示し、設定から再表示できます。 -->
+  <dialog id="guideDialog" class="library-dialog onboarding-dialog guide-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">QUICK GUIDE</p>
+        <h2>初回操作ガイド</h2>
+      </div>
+      <button id="closeGuideButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="guide-page">
+      <span id="guideProgress" class="guide-progress">1 / 7</span>
+      <div id="guideIcon" class="guide-icon" aria-hidden="true">⌂</div>
+      <h3 id="guideTitle">ホーム画面へ追加</h3>
+      <p id="guideBody"></p>
+    </div>
+    <div class="guide-actions">
+      <button id="guidePreviousButton" class="button" type="button">前へ</button>
+      <button id="guideSkipButton" class="button" type="button">スキップ</button>
+      <button id="guideNextButton" class="button primary" type="button">次へ</button>
+      <button id="guideFinishButton" class="button primary" type="button" hidden>使ってみる</button>
     </div>
   </dialog>
 
@@ -561,8 +680,8 @@
   <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
   <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
-  <script defer src="./1_App/js/onedrive-storage.js?v=35"></script>
+  <script defer src="./1_App/js/onedrive-storage.js?v=38"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=37"></script>
+  <script defer src="./1_App/js/app.js?v=38"></script>
 </body>
 </html>
