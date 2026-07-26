@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 16;
+const SCHEMA_VERSION = 17;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -136,9 +136,10 @@ function normalizeTextFont(value) {
   return TEXT_FONTS[value] ? value : "gothic";
 }
 
-// コート向きを0度または180度へ補正します。
+// コート向きを0度・90度・180度・270度のいずれかへ補正します。
 function normalizeCourtRotation(value) {
-  return Number(value) === 180 ? 180 : 0;
+  const normalized = ((Number(value) % 360) + 360) % 360;
+  return [0, 90, 180, 270].includes(normalized) ? normalized : 0;
 }
 
 // 自動保存に使うキーを定義します。
@@ -151,7 +152,7 @@ const LIBRARY_KEY = "basketball-tactics-library-v1";
 // モバイル表示の選択を端末ごとに保持するキーです。
 const MOBILE_LAYOUT_KEY = "basketball-tactics-mobile-layout-v1";
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v39";
+const APP_VERSION = "v40";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -898,14 +899,25 @@ function createDefaultStep(number, size) {
   };
 }
 
-// 現在のコートサイズを返します。
-function getCourtSize() {
+// 指定したコート種別の回転前サイズを返します。
+function getBaseCourtSize(mode = state.courtMode) {
   // 全面の場合は全面サイズを返します。
-  if (state.courtMode === "full") {
+  if (mode === "full") {
     return FULL_COURT;
   }
   // それ以外は半面サイズを返します。
   return HALF_COURT;
+}
+
+// 現在の回転方向を反映したコートサイズを返します。
+function getCourtSize() {
+  const baseSize = getBaseCourtSize();
+  const rotation = normalizeCourtRotation(state.courtRotation);
+  // 90度・270度では縦横を入れ替え、コート比率を崩さず縦向きにします。
+  if (rotation === 90 || rotation === 270) {
+    return { width: baseSize.height, height: baseSize.width };
+  }
+  return baseSize;
 }
 
 // コート本体にスローイン用外周を加えたCanvas論理サイズを返します。
@@ -1125,7 +1137,7 @@ function migrateSnapshot(snapshot) {
   migrated.playbackSpeed = normalizeSpeed(migrated.playbackSpeed);
   // 移動線表示設定を補います。
   migrated.showMovementLines = migrated.showMovementLines !== false;
-  // 旧版データは従来どおり0度、対応データは0度または180度へ補正します。
+  // 旧版データは従来どおり0度、対応データは4方向のいずれかへ補正します。
   migrated.courtRotation = normalizeCourtRotation(migrated.courtRotation);
   // ライブラリ管理情報を補います。
   migrated.libraryMeta = migrated.libraryMeta ?? { folder: "Shared", tags: [], favorite: false };
@@ -1466,14 +1478,23 @@ function getPlaybackBall(ball, stepId) {
 
 // コートを描きます。
 function drawCourt(ctx) {
-  // 現在のコートサイズを取得します。
-  const size = getCourtSize();
+  // 回転前のコート寸法と現在の向きを取得します。
+  const size = getBaseCourtSize();
+  const rotation = normalizeCourtRotation(state.courtRotation);
   // コート線だけを回転できるよう描画状態を保存します。
   ctx.save();
-  // 反対方向の場合はコート中心を基準に180度回転します。
-  if (normalizeCourtRotation(state.courtRotation) === 180) {
+  // 右向きでは回転後の左上へ原点を移して90度回転します。
+  if (rotation === 90) {
+    ctx.translate(size.height, 0);
+    ctx.rotate(Math.PI / 2);
+  // 下向きでは回転後の右下へ原点を移して180度回転します。
+  } else if (rotation === 180) {
     ctx.translate(size.width, size.height);
     ctx.rotate(Math.PI);
+  // 左向きでは回転後の左下へ原点を移して270度回転します。
+  } else if (rotation === 270) {
+    ctx.translate(0, size.width);
+    ctx.rotate(-Math.PI / 2);
   }
   // 木目色で背景を塗ります。
   ctx.fillStyle = "#d7a760";
@@ -3736,28 +3757,49 @@ function changeCourtMode(mode) {
   resizeCanvas();
 }
 
-// 1つの座標を現在コートの中心を基準に180度回転します。
-function rotatePointForCourt(point, size, rotatedPoints) {
+// 1つの座標を現在の縦横寸法に合わせて時計回りへ90度回転します。
+function rotatePointClockwise(point, oldSize, rotatedPoints) {
   if (!point || typeof point !== "object" || rotatedPoints.has(point)) {
     return;
   }
   rotatedPoints.add(point);
-  point.x = size.width - Number(point.x || 0);
-  point.y = size.height - Number(point.y || 0);
+  const previousX = Number(point.x || 0);
+  const previousY = Number(point.y || 0);
+  point.x = oldSize.height - previousY;
+  point.y = previousX;
 }
 
 // 現在のコート方向に合わせて、新しく追加する要素の初期位置を返します。
-function orientNewPointForCourt(point, size = getCourtSize()) {
-  if (normalizeCourtRotation(state.courtRotation) !== 180) {
+function orientNewPointForCourt(point, baseSize = getBaseCourtSize()) {
+  const rotation = normalizeCourtRotation(state.courtRotation);
+  const x = Number(point.x || 0);
+  const y = Number(point.y || 0);
+  if (rotation === 90) {
+    return { x: baseSize.height - y, y: x };
+  }
+  if (rotation === 180) {
+    return { x: baseSize.width - x, y: baseSize.height - y };
+  }
+  if (rotation === 270) {
+    return { x: y, y: baseSize.width - x };
+  }
+  if (rotation === 0) {
     return point;
   }
-  return {
-    x: size.width - Number(point.x || 0),
-    y: size.height - Number(point.y || 0)
-  };
+  return point;
 }
 
-// コートと全STEPの配置・動作を同じ向きへ180度回転します。
+// 画面表示やヒントへ使う4方向の名前を返します。
+function getCourtDirectionLabel(rotation = state.courtRotation) {
+  return {
+    0: "上向き",
+    90: "右向き",
+    180: "下向き",
+    270: "左向き"
+  }[normalizeCourtRotation(rotation)];
+}
+
+// コートと全STEPの配置・動作を同じ向きへ時計回りに90度回転します。
 function rotateCourtAndPlay() {
   // 再生途中の一時座標が混ざらないよう先に停止します。
   if (playbackTimer) {
@@ -3768,33 +3810,35 @@ function rotateCourtAndPlay() {
   drawSession = null;
   dragSession = null;
   selectedCanvasItem = null;
-  const size = getCourtSize();
+  const oldSize = getCourtSize();
   commitMutation(() => {
-    // コート線の表示方向を反転します。
-    state.courtRotation = normalizeCourtRotation(state.courtRotation) === 180 ? 0 : 180;
+    // 上・右・下・左の順で次の方向へ進めます。
+    state.courtRotation = (normalizeCourtRotation(state.courtRotation) + 90) % 360;
     // 同一座標オブジェクトが複数箇所から参照されていても1回だけ回転します。
     const rotatedPoints = new Set();
     state.steps.forEach((step) => {
-      (step.players ?? []).forEach((player) => rotatePointForCourt(player, size, rotatedPoints));
-      rotatePointForCourt(step.ball, size, rotatedPoints);
-      (step.cones ?? []).forEach((cone) => rotatePointForCourt(cone, size, rotatedPoints));
+      (step.players ?? []).forEach((player) => rotatePointClockwise(player, oldSize, rotatedPoints));
+      rotatePointClockwise(step.ball, oldSize, rotatedPoints);
+      (step.cones ?? []).forEach((cone) => rotatePointClockwise(cone, oldSize, rotatedPoints));
       (step.lines ?? []).forEach((line) => {
-        rotatePointForCourt(line.start, size, rotatedPoints);
-        rotatePointForCourt(line.end, size, rotatedPoints);
-        (line.points ?? []).forEach((point) => rotatePointForCourt(point, size, rotatedPoints));
+        rotatePointClockwise(line.start, oldSize, rotatedPoints);
+        rotatePointClockwise(line.end, oldSize, rotatedPoints);
+        (line.points ?? []).forEach((point) => rotatePointClockwise(point, oldSize, rotatedPoints));
       });
       // 文字・画像・動画は位置だけを回転し、読みやすい表示角度は維持します。
-      (step.texts ?? []).forEach((textItem) => rotatePointForCourt(textItem, size, rotatedPoints));
-      (step.media ?? []).forEach((mediaItem) => rotatePointForCourt(mediaItem, size, rotatedPoints));
+      (step.texts ?? []).forEach((textItem) => rotatePointClockwise(textItem, oldSize, rotatedPoints));
+      (step.media ?? []).forEach((mediaItem) => rotatePointClockwise(mediaItem, oldSize, rotatedPoints));
     });
   });
-  showToast(state.courtRotation === 180 ? "コートと全STEPを反対方向へ揃えました" : "コートと全STEPを元の方向へ戻しました");
+  // 90度・270度ではコートの縦横寸法が入れ替わるためCanvasも再計算します。
+  resizeCanvas();
+  showToast(`コートと全STEPを90度回転しました（${getCourtDirectionLabel()}）`);
 }
 
 // 新しいコーンの初期位置を返します。
 function getDefaultConePosition(color) {
-  // 現在のコートサイズを取得します。
-  const size = getCourtSize();
+  // 回転前のコートサイズを取得し、標準方向の初期位置を作ります。
+  const size = getBaseCourtSize();
   // 同じ色の現在数を取得します。
   const count = getActiveStep().cones.filter((cone) => cone.color === color).length;
   // 5列に折り返す列番号を計算します。
@@ -3843,8 +3887,8 @@ function getPlayerIdForNumber(side, number) {
 
 // 新しく追加する選手番号の初期位置を返します。
 function getDefaultPlayerPosition(side, number) {
-  // 現在のコートサイズを取得します。
-  const size = getCourtSize();
+  // 回転前のコートサイズを取得し、標準方向の初期位置を作ります。
+  const size = getBaseCourtSize();
   // 0番から18番を7列へ分けた列番号を計算します。
   const column = number % 7;
   // 0番から18番を7列へ分けた行番号を計算します。
@@ -6168,10 +6212,12 @@ function syncInterface(save = true) {
   // 通常表示と最大表示の回転ボタンへ現在方向を同期します。
   [rotateCourtButton, focusRotateCourtButton].forEach((button) => {
     if (!button) return;
-    const rotated = normalizeCourtRotation(state.courtRotation) === 180;
+    const rotation = normalizeCourtRotation(state.courtRotation);
+    const rotated = rotation !== 0;
     button.classList.toggle("rotation-active", rotated);
     button.setAttribute("aria-pressed", String(rotated));
-    button.title = rotated ? "コートと全STEPを元の方向へ戻す" : "コートと全STEPを180度回転";
+    button.setAttribute("aria-label", `コートを90度回転（現在: ${getCourtDirectionLabel(rotation)}）`);
+    button.title = `コートと全STEPを時計回りに90度回転（現在: ${getCourtDirectionLabel(rotation)}）`;
   });
   // STEP一覧を更新します。
   renderStepList();
