@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=34" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=35" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -475,7 +475,7 @@
         <button id="connectOneDriveButton" class="button primary" type="button">Microsoftアカウントで接続</button>
         <button id="disconnectOneDriveButton" class="button" type="button" hidden>接続を解除</button>
       </div>
-      <p class="onedrive-privacy">作戦JSONはOneDrive内の「アプリ」専用フォルダだけに保存されます。このアプリからOneDrive内のほかのファイルへはアクセスしません。</p>
+      <p class="onedrive-privacy">作戦JSONと取り込んだ動画は、OneDrive内の「アプリ」専用フォルダへ保存されます。作戦を削除しても、誤削除を防ぐため関連動画はOneDriveに残します。このアプリからOneDrive内のほかのファイルへはアクセスしません。</p>
     </div>
   </dialog>
 
@@ -521,8 +521,8 @@
   <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
   <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
-  <script defer src="./1_App/js/onedrive-storage.js?v=22"></script>
+  <script defer src="./1_App/js/onedrive-storage.js?v=35"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=34"></script>
+  <script defer src="./1_App/js/app.js?v=35"></script>
 </body>
 </html>
