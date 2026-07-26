@@ -144,6 +144,54 @@ const MEDIA_STORE_NAME = "assets";
 const LIBRARY_KEY = "basketball-tactics-library-v1";
 // モバイル表示の選択を端末ごとに保持するキーです。
 const MOBILE_LAYOUT_KEY = "basketball-tactics-mobile-layout-v1";
+// 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
+const APP_VERSION = "v38";
+// 利用規約は、この値を変更すると同意済み端末にも再表示されます。
+const TERMS_VERSION = "1.0";
+// 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
+const GUIDE_VERSION = "1.0";
+const TERMS_STORAGE_KEY = "basketball-tactics-terms-v1";
+const GUIDE_STORAGE_KEY = "basketball-tactics-guide-v1";
+const BACKUP_FORMAT = "basketball-tactics-board-backup";
+const BACKUP_FORMAT_VERSION = 1;
+const MAX_BACKUP_FILE_BYTES = 50 * 1024 * 1024;
+const GUIDE_PAGES = [
+  {
+    icon: "⌂",
+    title: "ホーム画面へ追加",
+    body: "このアプリは、ブラウザからホーム画面へ追加すると、通常のアプリのようにすぐ起動できます。\n\niPadやiPhoneでは、Safariの共有ボタンから「ホーム画面に追加」を選択してください。\n\nすでにホーム画面から起動している場合は、この手順は不要です。"
+  },
+  {
+    icon: "☁",
+    title: "OneDriveへ接続",
+    body: "作戦データを保存するため、MicrosoftアカウントでOneDriveへ接続します。\n\n保存先は、ログインした利用者本人のOneDriveです。他の利用者や開発者のOneDriveへ保存されることはありません。"
+  },
+  {
+    icon: "＋",
+    title: "新しい作戦を作成",
+    body: "「新しい作戦」から作戦作成を開始します。\n\nコート上にオフェンス、ディフェンス、ボール、コーン、文字などを配置できます。"
+  },
+  {
+    icon: "→",
+    title: "選手やボールを動かす",
+    body: "コート上の選手やボールを移動させ、移動線、パス、ドリブル、スクリーンなどを追加します。"
+  },
+  {
+    icon: "▣",
+    title: "STEPを追加",
+    body: "動きを作成したら、STEPを追加して状態を記録します。\n\nSTEPを重ねることで、複数の動きを連続した作戦として作成できます。"
+  },
+  {
+    icon: "▶",
+    title: "作戦を保存・再生",
+    body: "完成した作戦は、自分のOneDriveへ保存できます。\n\n作成したSTEPは、連続再生またはコマ送りで確認できます。"
+  },
+  {
+    icon: "⇩",
+    title: "定期的にバックアップ",
+    body: "大切な作戦は、設定画面の「一括バックアップ」から定期的に保存してください。\n\nバックアップファイルがあれば、端末変更時やデータトラブル時に作戦をまとめて復元できます。"
+  }
+];
 // 選択可能な線色を定義します。
 const LINE_COLORS = {
   // 黒線の色です。
@@ -322,6 +370,31 @@ const oneDriveClientIdInput = document.getElementById("oneDriveClientId");
 const oneDriveRedirectUriInput = document.getElementById("oneDriveRedirectUri");
 const connectOneDriveButton = document.getElementById("connectOneDriveButton");
 const disconnectOneDriveButton = document.getElementById("disconnectOneDriveButton");
+const oneDriveClientIdEditor = document.getElementById("oneDriveClientIdEditor");
+const changeOneDriveClientIdButton = document.getElementById("changeOneDriveClientIdButton");
+const resetOneDriveClientIdButton = document.getElementById("resetOneDriveClientIdButton");
+const bulkBackupButton = document.getElementById("bulkBackupButton");
+const bulkRestoreButton = document.getElementById("bulkRestoreButton");
+const bulkRestoreInput = document.getElementById("bulkRestoreInput");
+const restoreConflictMode = document.getElementById("restoreConflictMode");
+const bulkTransferStatus = document.getElementById("bulkTransferStatus");
+const termsDialog = document.getElementById("termsDialog");
+const closeTermsButton = document.getElementById("closeTermsButton");
+const termsAcceptCheckbox = document.getElementById("termsAcceptCheckbox");
+const instagramFollowedCheckbox = document.getElementById("instagramFollowedCheckbox");
+const acceptTermsButton = document.getElementById("acceptTermsButton");
+const termsAgreementStatus = document.getElementById("termsAgreementStatus");
+const guideDialog = document.getElementById("guideDialog");
+const guideProgress = document.getElementById("guideProgress");
+const guideIcon = document.getElementById("guideIcon");
+const guideTitle = document.getElementById("guideTitle");
+const guideBody = document.getElementById("guideBody");
+const guidePreviousButton = document.getElementById("guidePreviousButton");
+const guideNextButton = document.getElementById("guideNextButton");
+const guideFinishButton = document.getElementById("guideFinishButton");
+let termsRequired = false;
+let guidePageIndex = 0;
+let bulkTransferInProgress = false;
 let lastLibraryItems = [];
 // JSON読込用のファイル選択欄を取得します。
 const importJsonInput = document.getElementById("importJsonInput");
@@ -5053,7 +5126,7 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
   const errorMessage = String(nextStatus.error || "");
   const accountLabel = nextStatus.name || nextStatus.username || "Microsoftアカウント";
 
-  if (oneDriveClientIdInput && document.activeElement !== oneDriveClientIdInput) {
+  if (oneDriveClientIdInput && !oneDriveClientIdEditor?.hidden && document.activeElement !== oneDriveClientIdInput) {
     oneDriveClientIdInput.value = nextStatus.clientId || "";
   }
   if (oneDriveRedirectUriInput) {
@@ -5077,7 +5150,7 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
   }
 
   if (oneDriveButton) {
-    const buttonHint = connected ? "OneDrive接続中・設定を開く" : configured ? "OneDriveへ接続" : "OneDrive設定";
+    const buttonHint = connected ? "設定を開く（OneDrive接続中）" : "設定を開く";
     oneDriveButton.textContent = "☁";
     oneDriveButton.setAttribute("aria-label", buttonHint);
     oneDriveButton.title = buttonHint;
@@ -5088,12 +5161,322 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
     connectOneDriveButton.textContent = connected ? "接続済み" : "Microsoftアカウントで接続";
   }
   if (disconnectOneDriveButton) disconnectOneDriveButton.hidden = !connected;
+  if (bulkBackupButton) bulkBackupButton.disabled = bulkTransferInProgress || !connected;
+  if (bulkRestoreButton) bulkRestoreButton.disabled = bulkTransferInProgress || !connected;
+  if (resetOneDriveClientIdButton) {
+    resetOneDriveClientIdButton.disabled = !window.OneDriveStorage?.hasClientIdOverride?.();
+  }
   if (folderModeMessage) {
     folderModeMessage.textContent = connected
       ? `個人用OneDriveへ接続中：${accountLabel}（作戦JSON・動画を端末間で共有）`
       : configured
         ? "OneDriveへ接続すると、すべての端末で同じ作戦を開けます。"
         : "OneDrive保存を使うには初回設定を完了してください。";
+  }
+}
+
+function readStoredRecord(key) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || "null");
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateTermsAgreementDisplay() {
+  const record = readStoredRecord(TERMS_STORAGE_KEY);
+  document.getElementById("currentTermsVersion").textContent = TERMS_VERSION;
+  document.getElementById("termsDialogVersion").textContent = TERMS_VERSION;
+  document.getElementById("currentAppVersion").textContent = APP_VERSION;
+  if (!termsAgreementStatus) return;
+  if (record?.version === TERMS_VERSION && record.acceptedAt) {
+    const date = new Date(record.acceptedAt);
+    const label = Number.isNaN(date.getTime())
+      ? record.acceptedAt
+      : new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium", timeStyle: "short" }).format(date);
+    termsAgreementStatus.textContent = `同意日時：${label}`;
+  } else {
+    termsAgreementStatus.textContent = "未同意";
+  }
+}
+
+function openTermsDialog(required = false) {
+  const record = readStoredRecord(TERMS_STORAGE_KEY);
+  termsRequired = required;
+  if (oneDriveDialog?.open) oneDriveDialog.close();
+  closeTermsButton.hidden = required;
+  termsAcceptCheckbox.checked = record?.version === TERMS_VERSION;
+  instagramFollowedCheckbox.checked = Boolean(record?.instagramFollowed);
+  acceptTermsButton.disabled = !termsAcceptCheckbox.checked;
+  if (!termsDialog.open) termsDialog.showModal();
+}
+
+function hasCompletedGuide() {
+  return readStoredRecord(GUIDE_STORAGE_KEY)?.version === GUIDE_VERSION;
+}
+
+function renderGuidePage() {
+  const page = GUIDE_PAGES[guidePageIndex] || GUIDE_PAGES[0];
+  guideProgress.textContent = `${guidePageIndex + 1} / ${GUIDE_PAGES.length}`;
+  guideIcon.textContent = page.icon;
+  guideTitle.textContent = page.title;
+  guideBody.textContent = page.body;
+  guidePreviousButton.disabled = guidePageIndex === 0;
+  const isLast = guidePageIndex === GUIDE_PAGES.length - 1;
+  guideNextButton.hidden = isLast;
+  guideFinishButton.hidden = !isLast;
+}
+
+function openGuide() {
+  if (oneDriveDialog?.open) oneDriveDialog.close();
+  guidePageIndex = 0;
+  renderGuidePage();
+  if (!guideDialog.open) guideDialog.showModal();
+}
+
+function completeGuide(skipped) {
+  localStorage.setItem(GUIDE_STORAGE_KEY, JSON.stringify({
+    version: GUIDE_VERSION,
+    completedAt: new Date().toISOString(),
+    skipped: Boolean(skipped)
+  }));
+  if (guideDialog.open) guideDialog.close();
+  showToast(skipped ? "操作ガイドをスキップしました" : "準備が完了しました");
+}
+
+function initializeFirstRunExperience() {
+  updateTermsAgreementDisplay();
+  const termsRecord = readStoredRecord(TERMS_STORAGE_KEY);
+  if (termsRecord?.version !== TERMS_VERSION) {
+    openTermsDialog(true);
+    return;
+  }
+  if (!hasCompletedGuide()) {
+    openGuide();
+  }
+}
+
+function setBulkTransferBusy(busy, message = "") {
+  bulkTransferInProgress = Boolean(busy);
+  if (bulkTransferStatus && message) bulkTransferStatus.textContent = message;
+  if (bulkBackupButton) {
+    bulkBackupButton.disabled = bulkTransferInProgress || !window.OneDriveStorage?.isConnected();
+    bulkBackupButton.setAttribute("aria-busy", String(bulkTransferInProgress));
+  }
+  if (bulkRestoreButton) {
+    bulkRestoreButton.disabled = bulkTransferInProgress || !window.OneDriveStorage?.isConnected();
+    bulkRestoreButton.setAttribute("aria-busy", String(bulkTransferInProgress));
+  }
+  if (restoreConflictMode) restoreConflictMode.disabled = bulkTransferInProgress;
+}
+
+function requireOneDriveForBulkTransfer() {
+  if (window.OneDriveStorage?.isConnected()) return true;
+  window.alert("一括バックアップ・一括復元を利用するには、先にOneDriveへ接続してください。");
+  updateOneDriveInterface();
+  return false;
+}
+
+function backupFileName(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).formatToParts(date).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return `basketball-tactics-board-backup-${parts.year}-${parts.month}-${parts.day}-${parts.hour}${parts.minute}${parts.second}.json`;
+}
+
+function downloadJsonBlob(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function runBulkBackup() {
+  if (!requireOneDriveForBulkTransfer() || bulkTransferInProgress) return;
+  if (!window.confirm("OneDriveに保存されているすべての作戦を、1つのバックアップJSONとして端末へ保存します。\n\n一括バックアップを開始しますか？")) return;
+  setBulkTransferBusy(true, "OneDriveから作戦一覧を取得しています…");
+  try {
+    const result = await window.OneDriveStorage.backupAll((progress) => {
+      bulkTransferStatus.textContent = `バックアップ中… ${progress.completed} / ${progress.total}件`;
+    });
+    if (result.plays.length === 0 && result.failures.length > 0) {
+      throw new Error("すべての作戦データの取得に失敗しました。");
+    }
+    const filename = backupFileName();
+    const payload = {
+      format: BACKUP_FORMAT,
+      formatVersion: BACKUP_FORMAT_VERSION,
+      createdAt: new Date().toISOString(),
+      appVersion: APP_VERSION,
+      playCount: result.plays.length,
+      plays: result.plays
+    };
+    downloadJsonBlob(payload, filename);
+    const summary = `バックアップ成功：${result.plays.length}件\n取得失敗：${result.failures.length}件\n保存ファイル：${filename}`;
+    bulkTransferStatus.textContent = summary;
+    window.alert(`一括バックアップが完了しました。\n\n${summary}`);
+  } catch (error) {
+    console.error("一括バックアップに失敗しました。", error);
+    const message = error?.message === "すべての作戦データの取得に失敗しました。"
+      ? error.message
+      : "一括バックアップを作成できませんでした。OneDriveの接続と通信状態を確認してください。";
+    bulkTransferStatus.textContent = message;
+    window.alert(message);
+  } finally {
+    setBulkTransferBusy(false);
+  }
+}
+
+function validateBackupFile(parsed) {
+  if (!parsed || typeof parsed !== "object" || parsed.format !== BACKUP_FORMAT) {
+    throw new Error("このファイルはBasketball Tactics Boardの一括バックアップ形式ではありません。");
+  }
+  if (Number(parsed.formatVersion) !== BACKUP_FORMAT_VERSION) {
+    throw new Error(`このバックアップの形式バージョン（${parsed.formatVersion ?? "不明"}）には対応していません。`);
+  }
+  if (!Array.isArray(parsed.plays)) {
+    throw new Error("バックアップ内の作戦一覧が正しい形式ではありません。");
+  }
+  return parsed;
+}
+
+function backupEntryDetails(entry, index) {
+  if (!entry || typeof entry !== "object" || !entry.data || typeof entry.data !== "object") {
+    throw new Error(`${index + 1}件目の作戦データが正しい形式ではありません。`);
+  }
+  const snapshot = entry.data?.snapshot ?? entry.data;
+  if (!Array.isArray(snapshot?.steps) || snapshot.steps.length === 0) {
+    throw new Error(`${entry.name || `${index + 1}件目`}：STEPデータがありません。`);
+  }
+  const pathParts = String(entry.relativePath || "").replace(/\\/g, "/").split("/").filter(Boolean);
+  const pathFile = pathParts.pop() || "";
+  const folder = String(entry.folder || pathParts.join("/") || snapshot?.libraryMeta?.folder || "Shared").trim() || "Shared";
+  const name = [entry.name, snapshot.playName, pathFile.replace(/\.json$/i, ""), `復元した作戦 ${index + 1}`]
+    .map((value) => String(value || "").trim())
+    .find(Boolean);
+  return { entry, snapshot, folder, name };
+}
+
+function normalizedOneDrivePath(folder, name) {
+  return String(window.OneDriveStorage.buildRelativePath(folder, name)).replace(/\\/g, "/").toLocaleLowerCase("ja-JP");
+}
+
+function payloadWithRenamedPlay(data, name, folder) {
+  const copied = JSON.parse(JSON.stringify(data));
+  const snapshot = copied?.snapshot ?? copied;
+  snapshot.playName = name;
+  snapshot.libraryMeta = {
+    ...(snapshot.libraryMeta && typeof snapshot.libraryMeta === "object" ? snapshot.libraryMeta : {}),
+    folder
+  };
+  return copied;
+}
+
+async function restoreBackupFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!requireOneDriveForBulkTransfer() || bulkTransferInProgress) {
+    bulkRestoreInput.value = "";
+    return;
+  }
+  if (file.size > MAX_BACKUP_FILE_BYTES) {
+    window.alert("バックアップファイルが大きすぎます。50MB以下のJSONファイルを選択してください。");
+    bulkRestoreInput.value = "";
+    return;
+  }
+  setBulkTransferBusy(true, "バックアップファイルを確認しています…");
+  try {
+    let parsed;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      throw new Error("JSONを読み込めませんでした。ファイルが破損していないか確認してください。");
+    }
+    const backup = validateBackupFile(parsed);
+    const validEntries = [];
+    const failures = [];
+    backup.plays.forEach((entry, index) => {
+      try {
+        validEntries.push(backupEntryDetails(entry, index));
+      } catch (error) {
+        failures.push({ name: entry?.name || `${index + 1}件目`, reason: error.message });
+      }
+    });
+    if (validEntries.length === 0) {
+      throw new Error("復元できる作戦データがありません。バックアップファイルの内容を確認してください。");
+    }
+    const mode = restoreConflictMode.value;
+    const modeLabel = mode === "overwrite" ? "上書き" : mode === "rename" ? "別名で保存" : "スキップ";
+    if (!window.confirm(`${validEntries.length}件の作戦をOneDriveへ復元します。\n\n同名作戦の処理：${modeLabel}\n事前検証で復元できない作戦：${failures.length}件\n\n復元を開始しますか？`)) {
+      bulkTransferStatus.textContent = "一括復元をキャンセルしました。";
+      return;
+    }
+    bulkTransferStatus.textContent = "OneDriveの保存済み作戦を確認しています…";
+    const existing = await window.OneDriveStorage.list();
+    const occupiedPaths = new Set(existing.map((item) => String(item.relativePath || "").replace(/\\/g, "/").toLocaleLowerCase("ja-JP")));
+    const result = { success: 0, overwritten: 0, renamed: 0, skipped: 0 };
+    for (let index = 0; index < validEntries.length; index += 1) {
+      const item = validEntries[index];
+      bulkTransferStatus.textContent = `復元中… ${index + 1} / ${validEntries.length}件`;
+      try {
+        const originalPath = normalizedOneDrivePath(item.folder, item.name);
+        const hasConflict = occupiedPaths.has(originalPath);
+        if (hasConflict && mode === "skip") {
+          result.skipped += 1;
+          continue;
+        }
+        let targetName = item.name;
+        let renamed = false;
+        let overwritten = false;
+        if (hasConflict && mode === "rename") {
+          let suffix = 2;
+          while (occupiedPaths.has(normalizedOneDrivePath(item.folder, `${item.name} (${suffix})`))) suffix += 1;
+          targetName = `${item.name} (${suffix})`;
+          renamed = true;
+        } else if (hasConflict && mode === "overwrite") {
+          overwritten = true;
+        }
+        const data = targetName === item.name
+          ? item.entry.data
+          : payloadWithRenamedPlay(item.entry.data, targetName, item.folder);
+        await window.OneDriveStorage.save(item.folder, targetName, data);
+        occupiedPaths.add(normalizedOneDrivePath(item.folder, targetName));
+        result.success += 1;
+        if (renamed) result.renamed += 1;
+        if (overwritten) result.overwritten += 1;
+      } catch (error) {
+        console.error(`「${item.name}」の復元に失敗しました。`, error);
+        failures.push({ name: item.name, reason: "OneDriveへ保存できませんでした。" });
+      }
+    }
+    const failureDetails = failures.slice(0, 6).map((failure) => `・${failure.name}：${failure.reason}`).join("\n");
+    const summary = `復元成功：${result.success}件\n上書き：${result.overwritten}件\n別名保存：${result.renamed}件\nスキップ：${result.skipped}件\n失敗：${failures.length}件`;
+    bulkTransferStatus.textContent = `${summary}${failureDetails ? `\n${failureDetails}` : ""}`;
+    if (result.success === 0 && failures.length > 0) {
+      window.alert(`一括復元に失敗しました。\n\n${summary}\n${failureDetails}`);
+    } else {
+      window.alert(`一括復元が完了しました。\n\n${summary}${failureDetails ? `\n\n${failureDetails}` : ""}`);
+    }
+  } catch (error) {
+    console.error("一括復元に失敗しました。", error);
+    const message = error?.message || "バックアップファイルを復元できませんでした。";
+    bulkTransferStatus.textContent = message;
+    window.alert(message);
+  } finally {
+    bulkRestoreInput.value = "";
+    setBulkTransferBusy(false);
   }
 }
 
@@ -5998,14 +6381,43 @@ if (connectFolderButton) connectFolderButton.addEventListener("click", openOneDr
 if (oneDriveButton) oneDriveButton.addEventListener("click", openOneDriveSettings);
 document.getElementById("closeOneDriveButton")?.addEventListener("click", () => oneDriveDialog.close());
 
-// Microsoft EntraのクライアントIDをこの端末へ保存します。
+// 詳細設定から明示的に選んだ場合だけクライアントID入力欄を表示します。
+changeOneDriveClientIdButton?.addEventListener("click", () => {
+  oneDriveClientIdEditor.hidden = false;
+  oneDriveClientIdInput.value = window.OneDriveStorage?.status?.().clientId || "";
+  oneDriveClientIdInput.focus();
+  oneDriveClientIdInput.select();
+});
+
+document.getElementById("cancelOneDriveClientIdButton")?.addEventListener("click", () => {
+  oneDriveClientIdInput.value = "";
+  oneDriveClientIdEditor.hidden = true;
+});
+
+// Microsoft EntraのクライアントIDを確認後、この端末の上書き値として保存します。
 document.getElementById("saveOneDriveClientIdButton")?.addEventListener("click", () => {
   try {
-    window.OneDriveStorage.setClientId(oneDriveClientIdInput.value);
-    showToast("クライアントIDを保存しました");
-    window.setTimeout(() => window.location.reload(), 500);
+    const nextClientId = oneDriveClientIdInput.value.trim();
+    if (!window.confirm("Microsoft EntraのクライアントIDを変更します。\n\n誤ったクライアントIDを設定すると、OneDriveへ接続できなくなる可能性があります。\n\n変更してもよろしいですか？")) return;
+    window.OneDriveStorage.setClientId(nextClientId);
+    window.alert("クライアントIDを変更しました。OneDriveへの再接続が必要な場合があります。ページを再読み込みします。");
+    window.location.reload();
   } catch (error) {
-    window.alert(error.message);
+    console.error("クライアントIDを変更できませんでした。", error);
+    window.alert(error?.message || "クライアントIDを変更できませんでした。");
+  }
+});
+
+// 端末に保存した上書き値を削除し、配布版の既定クライアントIDへ戻します。
+resetOneDriveClientIdButton?.addEventListener("click", () => {
+  if (!window.confirm("クライアントIDをアプリの既定値へ戻します。\n\n現在のOneDrive接続をやり直す必要がある場合があります。\n\n既定値へ戻してもよろしいですか？")) return;
+  try {
+    window.OneDriveStorage.clearClientIdOverride();
+    window.alert("クライアントIDを既定値へ戻しました。ページを再読み込みします。");
+    window.location.reload();
+  } catch (error) {
+    console.error("クライアントIDを既定値へ戻せませんでした。", error);
+    window.alert("クライアントIDを既定値へ戻せませんでした。ブラウザーの保存設定を確認してください。");
   }
 });
 
@@ -6025,8 +6437,9 @@ document.getElementById("copyOneDriveRedirectButton")?.addEventListener("click",
 connectOneDriveButton?.addEventListener("click", async () => {
   try {
     if (!window.OneDriveStorage.isConfigured()) {
+      oneDriveClientIdEditor.hidden = false;
       oneDriveClientIdInput.focus();
-      window.alert("先にMicrosoft EntraのクライアントIDを入力して保存してください。");
+      window.alert("OneDriveの既定設定を読み込めませんでした。詳細設定からクライアントIDを確認してください。");
       return;
     }
     await window.OneDriveStorage.signIn();
@@ -6034,6 +6447,56 @@ connectOneDriveButton?.addEventListener("click", async () => {
     console.error("OneDriveへ接続できませんでした。", error);
     window.alert("OneDriveへ接続できませんでした。\n\n" + error.message);
   }
+});
+
+bulkBackupButton?.addEventListener("click", runBulkBackup);
+bulkRestoreButton?.addEventListener("click", () => {
+  if (!requireOneDriveForBulkTransfer() || bulkTransferInProgress) return;
+  bulkRestoreInput.click();
+});
+bulkRestoreInput?.addEventListener("change", restoreBackupFile);
+
+termsAcceptCheckbox?.addEventListener("change", () => {
+  acceptTermsButton.disabled = !termsAcceptCheckbox.checked;
+});
+
+acceptTermsButton?.addEventListener("click", () => {
+  if (!termsAcceptCheckbox.checked) return;
+  localStorage.setItem(TERMS_STORAGE_KEY, JSON.stringify({
+    version: TERMS_VERSION,
+    acceptedAt: new Date().toISOString(),
+    instagramFollowed: Boolean(instagramFollowedCheckbox.checked)
+  }));
+  termsRequired = false;
+  termsDialog.close();
+  updateTermsAgreementDisplay();
+  if (!hasCompletedGuide()) openGuide();
+  else showToast("利用規約への同意を保存しました");
+});
+
+document.getElementById("openTermsButton")?.addEventListener("click", () => openTermsDialog(false));
+closeTermsButton?.addEventListener("click", () => {
+  if (!termsRequired) termsDialog.close();
+});
+termsDialog?.addEventListener("cancel", (event) => {
+  if (termsRequired) event.preventDefault();
+});
+
+document.getElementById("openGuideButton")?.addEventListener("click", openGuide);
+guidePreviousButton?.addEventListener("click", () => {
+  guidePageIndex = Math.max(0, guidePageIndex - 1);
+  renderGuidePage();
+});
+guideNextButton?.addEventListener("click", () => {
+  guidePageIndex = Math.min(GUIDE_PAGES.length - 1, guidePageIndex + 1);
+  renderGuidePage();
+});
+guideFinishButton?.addEventListener("click", () => completeGuide(false));
+document.getElementById("guideSkipButton")?.addEventListener("click", () => completeGuide(true));
+document.getElementById("closeGuideButton")?.addEventListener("click", () => completeGuide(true));
+guideDialog?.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  completeGuide(true);
 });
 
 // 現在のMicrosoftアカウント接続を解除します。
@@ -6067,6 +6530,7 @@ window.addEventListener("load", async () => {
     console.error("OneDriveの初期化に失敗しました。", error);
   }
   updateOneDriveInterface();
+  initializeFirstRunExperience();
 });
 document.getElementById("savePlayButton").addEventListener("click", savePlayToLibrary);
 // 作戦読込ボタンを登録します。

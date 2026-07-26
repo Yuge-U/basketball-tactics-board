@@ -86,6 +86,10 @@ window.OneDriveStorage = (() => {
     localStorage.removeItem(CLIENT_ID_KEY);
   }
 
+  function hasClientIdOverride() {
+    return GUID_PATTERN.test(String(localStorage.getItem(CLIENT_ID_KEY) || "").trim());
+  }
+
   async function init() {
     if (initPromise) return initPromise;
     initPromise = (async () => {
@@ -275,6 +279,15 @@ window.OneDriveStorage = (() => {
     return cleaned || "名称未設定の作戦";
   }
 
+  function buildRelativePath(folder, name) {
+    const normalizedFolder = String(folder || "Shared")
+      .split("/")
+      .filter(Boolean)
+      .map(safeFolderName)
+      .join("/") || "Shared";
+    return `${normalizedFolder}/${safeFileName(name)}.json`;
+  }
+
   async function save(folder, name, data) {
     const targetFolder = await ensureFolderPath(folder);
     const filename = `${safeFileName(name)}.json`;
@@ -290,6 +303,62 @@ window.OneDriveStorage = (() => {
       id: uploaded.id,
       relativePath: `${String(folder || "Shared").replace(/^\/+|\/+$/g, "")}/${filename}`
     };
+  }
+
+  async function backupAll(onProgress) {
+    const root = await getAppRoot();
+    const files = await collectFiles(root.id);
+    const plays = [];
+    const failures = [];
+    let completed = 0;
+    const notifyProgress = () => {
+      if (typeof onProgress === "function") {
+        onProgress({ completed, total: files.length, success: plays.length, failed: failures.length });
+      }
+    };
+    notifyProgress();
+    for (let index = 0; index < files.length; index += 4) {
+      const batch = files.slice(index, index + 4);
+      const parsed = await Promise.all(batch.map(async (file) => {
+        try {
+          const data = await loadJsonById(file.id);
+          const snapshot = data?.snapshot || data;
+          if (!Array.isArray(snapshot?.steps) || snapshot.steps.length === 0) {
+            throw new OneDriveError("invalid-play-data", "STEPデータがありません。");
+          }
+          const pathParts = String(file.relativePath || file.name).replace(/\\/g, "/").split("/");
+          pathParts.pop();
+          return {
+            ok: true,
+            play: {
+              name: snapshot.playName || file.name.replace(/\.json$/i, ""),
+              folder: pathParts.join("/") || snapshot?.libraryMeta?.folder || "Shared",
+              relativePath: file.relativePath,
+              updatedAt: file.lastModifiedDateTime || "",
+              data
+            }
+          };
+        } catch (error) {
+          console.warn(`OneDrive上の「${file.relativePath}」をバックアップできませんでした。`, error);
+          return {
+            ok: false,
+            failure: {
+              relativePath: file.relativePath,
+              reason: error?.code === "invalid-play-data" ? "作戦データの形式が正しくありません。" : "作戦データを取得できませんでした。"
+            }
+          };
+        } finally {
+          completed += 1;
+          notifyProgress();
+        }
+      }));
+      parsed.forEach((result) => {
+        if (result.ok) plays.push(result.play);
+        else failures.push(result.failure);
+      });
+      notifyProgress();
+    }
+    return { plays, failures, total: files.length };
   }
 
   function mediaExtension(media) {
@@ -407,6 +476,7 @@ window.OneDriveStorage = (() => {
     signIn,
     signOut,
     save,
+    backupAll,
     saveMedia,
     loadMedia,
     list,
@@ -417,6 +487,8 @@ window.OneDriveStorage = (() => {
     isConnected,
     setClientId,
     clearClientIdOverride,
+    hasClientIdOverride,
+    buildRelativePath,
     redirectUri,
     onStatusChange,
     OneDriveError

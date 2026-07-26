@@ -52,7 +52,7 @@ https://GitHubユーザー名.github.io/basketball-tactics-board/
 以後は「作戦保存」でOneDriveへ保存され、「ライブラリ」に同じアカウントの作戦が表示されます。
 PCとiPadのどちらでも同じ手順です。
 
-「JSON保存」「JSON読込」は、OneDrive連携とは別の手動バックアップとして残しています。
+「設定」→「バックアップと復元」では、OneDrive上の全作戦を1つのJSONへ一括バックアップ・一括復元できます。「JSON保存」「JSON読込」も、個別作戦の手動バックアップとして残しています。
 
 ## 更新方法
 
