@@ -875,6 +875,33 @@ button:disabled {
   font-weight: 700;
 }
 
+/* テキスト縁取りの有無を一つの切替領域へまとめます。 */
+.text-outline-selector {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #f3f4f6;
+}
+
+.text-outline-selector button {
+  min-width: 46px;
+  height: 30px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 9px;
+  color: #4b5563;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.text-outline-selector button.active {
+  color: #ffffff;
+  background: var(--primary);
+}
+
 /* 色ボタンを横並びにします。 */
 .color-selector {
   display: flex;
@@ -1391,6 +1418,30 @@ body.board-focus .focus-editor-panel.open {
   color: #ffffff;
   font-size: 12px;
   font-weight: 800;
+}
+
+.focus-outline-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.focus-outline-control .text-outline-selector {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.focus-outline-control .text-outline-selector button {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.focus-outline-control .text-outline-selector button.active {
+  color: #1e3a8a;
+  background: rgba(219, 234, 254, 0.96);
 }
 
 .focus-font-control select {
