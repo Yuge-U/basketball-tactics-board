@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 13;
+const SCHEMA_VERSION = 14;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -103,6 +103,38 @@ const MIN_SPEED = 0.5;
 const MAX_SPEED = 2;
 // コート上へ配置するテキストの標準サイズを定義します。
 const TEXT_FONT_SIZE = 34;
+// 配置テキストで選べる一般的なフォントを定義します。
+const TEXT_FONTS = {
+  gothic: {
+    label: "ゴシック",
+    family: '"Noto Sans JP", "Yu Gothic UI", "Yu Gothic", sans-serif'
+  },
+  mincho: {
+    label: "明朝",
+    family: '"Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif'
+  },
+  rounded: {
+    label: "丸ゴシック",
+    family: '"Arial Rounded MT Bold", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif'
+  },
+  arial: {
+    label: "Arial",
+    family: 'Arial, Helvetica, sans-serif'
+  },
+  times: {
+    label: "Times",
+    family: '"Times New Roman", Times, serif'
+  },
+  handwritten: {
+    label: "手書き風",
+    family: '"Comic Sans MS", "Bradley Hand", "Yu Gothic", cursive'
+  }
+};
+
+// フォント名を利用可能な値へ補正します。
+function normalizeTextFont(value) {
+  return TEXT_FONTS[value] ? value : "gothic";
+}
 // 自動保存に使うキーを定義します。
 const AUTOSAVE_KEY = "basketball-tactics-autosave-v1";
 // 容量の大きい取込動画を端末内へ保存するIndexedDB名です。
@@ -743,6 +775,7 @@ function createInitialState() {
     courtMode: "half",
     activeTool: "select",
     activeLineColor: "black",
+    activeTextFont: "gothic",
     playerSize: "medium",
     ballSize: "medium",
     movementSpeed: 1,
@@ -819,6 +852,8 @@ function createSnapshot() {
     courtMode: state.courtMode,
     // 選択中の線色を保存します。
     activeLineColor: state.activeLineColor,
+    // 新しく配置するテキストのフォントを保存します。
+    activeTextFont: state.activeTextFont,
     // 選手マーカーの表示サイズを保存します。
     playerSize: state.playerSize,
     // ボールの表示サイズを保存します。
@@ -937,6 +972,8 @@ function migrateSnapshot(snapshot) {
       textItem.color = LINE_COLORS[textItem.color] ? textItem.color : "black";
       // 有効な文字サイズでなければ標準サイズを設定します。
       textItem.fontSize = Number.isFinite(Number(textItem.fontSize)) ? Number(textItem.fontSize) : TEXT_FONT_SIZE;
+      // 旧版テキストには標準のゴシックを設定します。
+      textItem.font = normalizeTextFont(textItem.font);
       // 拡大率と回転角を補います。
       textItem.scale = Math.max(0.25, Math.min(5, Number(textItem.scale) || 1));
       textItem.rotation = Number(textItem.rotation) || 0;
@@ -983,6 +1020,8 @@ function migrateSnapshot(snapshot) {
   });
   // 選択中の線色を補正します。
   migrated.activeLineColor = LINE_COLORS[migrated.activeLineColor] ? migrated.activeLineColor : "black";
+  // 新しく配置するテキストのフォントを補正します。
+  migrated.activeTextFont = normalizeTextFont(migrated.activeTextFont);
   // 選手マーカーサイズを補正し、未設定データは標準の中へ設定します。
   migrated.playerSize = normalizePlayerSize(migrated.playerSize);
   // ボールサイズを補正し、未設定データは新しい標準の中へ設定します。
@@ -1026,6 +1065,8 @@ function applySnapshot(snapshot) {
   state.courtMode = migrated.courtMode ?? "half";
   // 選択中の線色を復元します。
   state.activeLineColor = migrated.activeLineColor ?? "black";
+  // 新しく配置するテキストのフォントを復元します。
+  state.activeTextFont = normalizeTextFont(migrated.activeTextFont);
   // 選手マーカーの表示サイズを復元します。
   state.playerSize = normalizePlayerSize(migrated.playerSize);
   // ボールの表示サイズを復元します。
@@ -1127,31 +1168,27 @@ function redo() {
 function resizeCanvas() {
   // 現在のコートサイズを取得します。
   const size = getCourtDisplaySize();
-  // コートの縦横比を計算します。
-  const courtRatio = size.width / size.height;
-  // 通常編集画面ではコートの実寸比率を崩さず、画面の高さへ収めます。
+  // 通常編集画面ではボード列の余白も素材を置けるCanvasとして使います。
   if (!isFocusMode) {
-    // 外枠の縦横比をコート比率へ設定します。
-    canvasShell.style.aspectRatio = `${size.width} / ${size.height}`;
-    // ボード列の利用可能な横幅を取得します。
-    const availableWidth = canvasShell.parentElement?.clientWidth || window.innerWidth;
+    // 固定比率を解除して、列幅全体を編集領域にします。
+    canvasShell.style.aspectRatio = "auto";
     // Canvas上端から画面下端までの高さを取得します。
     const top = canvasShell.getBoundingClientRect().top;
     // モバイル表示ではSTEP操作と横ツール列、通常表示ではSTEP操作分を残します。
     const controlReserve = mobileLayoutEnabled ? 106 : 42;
-    // 残りの画面高をコートへ最大限割り当てます。
+    // 残りの画面高を編集領域へ最大限割り当てます。
     const availableHeight = Math.max(300, window.innerHeight - top - controlReserve);
-    // 横幅と高さの両方へ収まる表示幅を計算します。
-    const fittedWidth = Math.min(availableWidth, availableHeight * courtRatio);
-    // 計算した幅を設定します。
-    canvasShell.style.width = `${Math.max(360, fittedWidth)}px`;
-    // ボード列の中央へ配置します。
-    canvasShell.style.alignSelf = "center";
+    // ボード列の幅と利用可能な高さをそのままCanvasへ割り当てます。
+    canvasShell.style.width = "100%";
+    canvasShell.style.height = `${availableHeight}px`;
+    canvasShell.style.alignSelf = "stretch";
   } else {
     // 最大表示では画面全体を使うため比率指定を解除します。
     canvasShell.style.aspectRatio = "auto";
     // 最大表示時は横幅指定を解除します。
     canvasShell.style.width = "100%";
+    // 通常表示で設定した高さを最大表示用へ更新します。
+    canvasShell.style.height = "100dvh";
     // 最大表示時は配置指定を解除します。
     canvasShell.style.alignSelf = "stretch";
   }
@@ -1936,8 +1973,9 @@ function drawCourtText(ctx, textItem) {
   // 自由な拡大縮小を適用します。
   const scale = Math.max(0.25, Math.min(5, Number(textItem.scale) || 1));
   ctx.scale(scale, scale);
-  // 太字の日本語対応フォントを設定します。
-  ctx.font = `800 ${fontSize}px "Noto Sans JP", "Yu Gothic", sans-serif`;
+  // 選択した日本語対応フォントを設定します。
+  const fontFamily = TEXT_FONTS[normalizeTextFont(textItem.font)].family;
+  ctx.font = `800 ${fontSize}px ${fontFamily}`;
   // 文字を中央基準で配置します。
   ctx.textAlign = "center";
   // 文字を縦方向も中央基準で配置します。
@@ -2792,8 +2830,9 @@ function handlePointerDown(event) {
   canvas.setPointerCapture(event.pointerId);
   // 操作ヒントを隠します。
   canvasHint.classList.add("hidden");
-  // コート座標を取得します。
-  const rawPoint = clampPoint(pointerToCourt(event));
+  // 選択・消去・テキストはCanvas全体、それ以外はコート外周内の座標を使います。
+  const pointerPoint = pointerToCourt(event);
+  const rawPoint = ["select", "erase", "text"].includes(state.activeTool) ? pointerPoint : clampPoint(pointerPoint);
   // 選択ツールの場合を処理します。
   if (state.activeTool === "select") {
     // 選択中素材の変形ハンドルを優先して確認します。
@@ -2806,6 +2845,11 @@ function handlePointerDown(event) {
       selectedCanvasItem = target.type === "text" || target.type === "media" ? { ...target } : null;
       // 現在の素材データを取得します。
       const canvasItem = getSelectedCanvasItem(target);
+      // 選択したテキストのフォントを設定欄へ反映します。
+      if (target.type === "text" && canvasItem) {
+        state.activeTextFont = normalizeTextFont(canvasItem.font);
+        syncTextFontSelectors();
+      }
       const itemSize = canvasItem ? getCanvasItemSize(target, canvasItem) : null;
       // ドラッグ前の状態を保存します。
       dragSession = {
@@ -2913,7 +2957,7 @@ function handlePointerDown(event) {
     // キャンセルまたは空文字の場合は追加しません。
     if (enteredText !== null && enteredText.trim()) {
       // 新しいテキストデータを仮作成します。
-      const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, fontSize: TEXT_FONT_SIZE, scale: 1, rotation: 0 };
+      const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, font: normalizeTextFont(state.activeTextFont), fontSize: TEXT_FONT_SIZE, scale: 1, rotation: 0 };
       // テキスト全体がコート内へ収まる位置を計算します。
       const position = clampTextPosition(textItem, rawPoint);
       // 履歴付きでテキストを追加します。
@@ -2985,8 +3029,8 @@ function handleCanvasDoubleClick(event) {
     // 処理を終了します。
     return;
   }
-  // コート座標を取得します。
-  const point = clampPoint(pointerToCourt(event));
+  // Canvas全体の座標を取得し、コート外の素材も編集可能にします。
+  const point = pointerToCourt(event);
   // 動画上のダブルクリックは再生・停止を切り替えます。
   const mediaItem = findMediaAt(point);
   if (mediaItem?.type === "video") {
@@ -3265,6 +3309,31 @@ function setLineColor(colorName) {
     button.classList.toggle("active", button.dataset.lineColor === safeColor);
   });
   // 設定を自動保存します。
+  autosave();
+}
+
+// 通常表示と最大表示のフォント選択欄を同期します。
+function syncTextFontSelectors() {
+  const safeFont = normalizeTextFont(state.activeTextFont);
+  document.querySelectorAll("[data-text-font-select]").forEach((select) => {
+    select.value = safeFont;
+  });
+}
+
+// 新しく配置するテキスト、または選択中テキストのフォントを変更します。
+function setTextFont(fontName) {
+  const safeFont = normalizeTextFont(fontName);
+  const selectedText = selectedCanvasItem?.type === "text" ? getSelectedCanvasItem() : null;
+  const before = createSnapshot();
+  state.activeTextFont = safeFont;
+  if (selectedText && normalizeTextFont(selectedText.font) !== safeFont) {
+    pushUndo(before);
+    selectedText.font = safeFont;
+    syncInterface();
+    return;
+  }
+  syncTextFontSelectors();
+  render();
   autosave();
 }
 
@@ -5587,6 +5656,8 @@ function syncInterface(save = true) {
   syncFocusPlaybackSettings();
   // 色ボタンを選択状態へ同期します。
   setLineColor(state.activeLineColor);
+  // テキストのフォント選択欄を同期します。
+  syncTextFontSelectors();
   // 移動速度設定を同期します。
   movementSpeedRange.value = String(normalizeSpeed(state.movementSpeed));
   // 移動速度の数値を同期します。
@@ -5693,6 +5764,11 @@ document.querySelectorAll("[data-tool]").forEach((button) => {
 document.querySelectorAll("[data-line-color]").forEach((button) => {
   // クリック時に対応色へ切り替えます。
   button.addEventListener("click", () => setLineColor(button.dataset.lineColor));
+});
+
+// 通常表示と最大表示のフォント選択欄へイベントを登録します。
+document.querySelectorAll("[data-text-font-select]").forEach((select) => {
+  select.addEventListener("change", () => setTextFont(select.value));
 });
 
 // 選手サイズボタンへイベントを登録します。
