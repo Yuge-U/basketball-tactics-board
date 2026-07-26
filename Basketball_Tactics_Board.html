@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=35" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=36" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -264,6 +264,18 @@
               <button id="focusUndoButton" class="focus-mini-button" type="button" title="元に戻す">↶</button>
               <button id="focusRedoButton" class="focus-mini-button" type="button" title="やり直す">↷</button>
             </div>
+            <!-- 最大表示中も配置テキストのフォントを選択します。 -->
+            <label class="focus-font-control">
+              <span>文字</span>
+              <select data-text-font-select aria-label="テキストのフォント">
+                <option value="gothic">ゴシック</option>
+                <option value="mincho">明朝</option>
+                <option value="rounded">丸ゴシック</option>
+                <option value="arial">Arial</option>
+                <option value="times">Times</option>
+                <option value="handwritten">手書き風</option>
+              </select>
+            </label>
             <!-- 最大表示中も選手とボールのサイズを変更します。 -->
             <div class="focus-size-controls">
               <span>選手</span>
@@ -309,6 +321,18 @@
               <button class="color-button blue" type="button" data-line-color="blue" aria-label="青" title="青"></button>
             </div>
           </div>
+          <!-- 配置するテキストのフォントを選択します。 -->
+          <label class="setting-group">
+            <span class="setting-label">文字フォント</span>
+            <select class="text-font-select" data-text-font-select aria-label="テキストのフォント">
+              <option value="gothic">ゴシック</option>
+              <option value="mincho">明朝</option>
+              <option value="rounded">丸ゴシック</option>
+              <option value="arial">Arial</option>
+              <option value="times">Times</option>
+              <option value="handwritten">手書き風</option>
+            </select>
+          </label>
           <!-- コート上の選手マーカーサイズを切り替えます。 -->
           <div class="setting-group">
             <span class="setting-label">選手サイズ</span>
@@ -523,6 +547,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=35"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=35"></script>
+  <script defer src="./1_App/js/app.js?v=36"></script>
 </body>
 </html>
