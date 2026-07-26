@@ -1,1 +1,1 @@
-Basketball Tactics Board v39 - Separate settings gear and synchronized court rotation
+Basketball Tactics Board v40 - Four-direction synchronized court rotation
