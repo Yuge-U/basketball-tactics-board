@@ -1,1 +1,1 @@
-Basketball Tactics Board v40 - Four-direction synchronized court rotation
+Basketball Tactics Board v41 - Editable and synchronized save folders

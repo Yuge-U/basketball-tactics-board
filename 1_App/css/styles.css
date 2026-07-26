@@ -1791,6 +1791,13 @@ body.board-focus .focus-controls {
   margin-top: 0;
 }
 
+.folder-select-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
 .meta-select,
 .meta-input {
   min-height: 32px;
@@ -1801,6 +1808,17 @@ body.board-focus .focus-controls {
 .play-meta-inline .meta-select {
   width: 126px;
   min-width: 110px;
+}
+
+.folder-manage-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-color: #cbd5e1;
+  color: #475569;
+  background: #ffffff;
+  font-size: 15px;
 }
 
 .play-meta-inline .meta-input {
@@ -2001,6 +2019,14 @@ body.board-focus .focus-controls {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   }
 
+  .folder-select-group {
+    min-width: 0;
+  }
+
+  .folder-select-group .meta-select {
+    width: 100%;
+  }
+
   .favorite-toggle {
     grid-column: 1 / -1;
   }
@@ -2009,6 +2035,86 @@ body.board-focus .focus-controls {
 /* OneDrive設定ダイアログの内容です。 */
 .onedrive-dialog {
   width: min(760px, calc(100vw - 28px));
+}
+
+.save-folder-manager-dialog {
+  width: min(680px, calc(100vw - 28px));
+}
+
+.save-folder-manager-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100dvh - 130px);
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.save-folder-add-row,
+.save-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-folder-add-row .meta-input,
+.save-folder-row .meta-input {
+  min-width: 0;
+  flex: 1;
+}
+
+.save-folder-help {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.save-folder-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.save-folder-row {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px;
+  background: #f8fafc;
+}
+
+.save-folder-row .icon-button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+}
+
+.save-folder-manager-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 18px;
+  color: #64748b;
+  background: #f8fafc;
+  text-align: center;
+  font-size: 13px;
+}
+
+.save-folder-manager-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.save-folder-manager-footer .folder-mode-message {
+  flex: 1;
+  margin: 0;
+  text-align: right;
+}
+
+.save-folder-manager-footer .error-text {
+  color: #b91c1c;
 }
 
 .onedrive-content {
@@ -2669,6 +2775,10 @@ body.mobile-layout .panel-card {
     width: min(54vw, 180px);
   }
 
+  body.mobile-layout .folder-select-group .meta-select {
+    width: min(46vw, 150px);
+  }
+
   body.mobile-layout .top-actions {
     gap: 5px;
   }
@@ -2751,5 +2861,23 @@ body.mobile-layout .panel-card {
 @media (max-width: 600px) {
   body.mobile-layout .play-meta-inline .meta-input {
     display: none;
+  }
+
+  .save-folder-add-row,
+  .save-folder-row {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .save-folder-add-row .meta-input,
+  .save-folder-row .meta-input {
+    display: block;
+    width: 100%;
+    flex-basis: calc(100% - 86px);
+  }
+
+  .save-folder-manager-footer .folder-mode-message {
+    flex-basis: 100%;
+    text-align: left;
   }
 }

@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=40" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=41" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -40,19 +40,22 @@
           <!-- 作戦名を入力します。 -->
           <input id="playName" class="play-name" type="text" value="new play" maxlength="50" aria-label="作戦名" />
           <div class="play-meta-inline">
-            <select id="playFolder" class="meta-select" aria-label="保存フォルダ">
-              <option value="Shared">Shared</option>
-              <option value="U12/Offense">U12 / Offense</option>
-              <option value="U12/Defense">U12 / Defense</option>
-              <option value="U12/SLOB">U12 / SLOB</option>
-              <option value="U12/BLOB">U12 / BLOB</option>
-              <option value="U12/Practice">U12 / Practice</option>
-              <option value="U15/Offense">U15 / Offense</option>
-              <option value="U15/Defense">U15 / Defense</option>
-              <option value="U15/SLOB">U15 / SLOB</option>
-              <option value="U15/BLOB">U15 / BLOB</option>
-              <option value="U15/Practice">U15 / Practice</option>
-            </select>
+            <div class="folder-select-group">
+              <select id="playFolder" class="meta-select" aria-label="保存フォルダ">
+                <option value="Shared">Shared</option>
+                <option value="U12/Offense">U12 / Offense</option>
+                <option value="U12/Defense">U12 / Defense</option>
+                <option value="U12/SLOB">U12 / SLOB</option>
+                <option value="U12/BLOB">U12 / BLOB</option>
+                <option value="U12/Practice">U12 / Practice</option>
+                <option value="U15/Offense">U15 / Offense</option>
+                <option value="U15/Defense">U15 / Defense</option>
+                <option value="U15/SLOB">U15 / SLOB</option>
+                <option value="U15/BLOB">U15 / BLOB</option>
+                <option value="U15/Practice">U15 / Practice</option>
+              </select>
+              <button id="manageSaveFoldersButton" class="button icon-only-button folder-manage-button" type="button" aria-label="保存フォルダを管理" title="保存フォルダを追加・編集・削除">✎</button>
+            </div>
             <input id="playTags" class="meta-input" type="text" placeholder="タグ：ゾーン, プレス" maxlength="100" aria-label="タグ" />
             <label class="favorite-toggle play-favorite-toggle" title="お気に入り">
               <input id="playFavorite" type="checkbox" aria-label="お気に入り" />
@@ -477,6 +480,29 @@
     <div id="libraryList" class="library-list"></div>
   </dialog>
 
+  <!-- 保存先一覧を追加・名前変更・削除するダイアログです。 -->
+  <dialog id="saveFolderManagerDialog" class="library-dialog save-folder-manager-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">SAVE FOLDERS</p>
+        <h2>保存フォルダ管理</h2>
+      </div>
+      <button id="closeSaveFolderManagerButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="save-folder-manager-content">
+      <div class="save-folder-add-row">
+        <input id="newSaveFolderInput" class="meta-input" type="text" maxlength="120" placeholder="例：U18/Offense" aria-label="新しい保存フォルダ名" />
+        <button id="addSaveFolderButton" class="button primary" type="button">追加</button>
+      </div>
+      <p class="save-folder-help">「/」で階層を作れます。名前変更・削除は保存先一覧だけに反映され、OneDrive上の既存作戦や動画は削除・移動されません。</p>
+      <div id="saveFolderManagerList" class="save-folder-manager-list" aria-label="保存フォルダ一覧"></div>
+      <div class="save-folder-manager-footer">
+        <button id="restoreDefaultSaveFoldersButton" class="button compact" type="button">初期フォルダを追加</button>
+        <p id="saveFolderManagerStatus" class="folder-mode-message" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </dialog>
+
   <!-- 個人用OneDriveの接続と詳細設定ダイアログです。 -->
   <dialog id="oneDriveDialog" class="library-dialog onedrive-dialog">
     <div class="dialog-header">
@@ -698,8 +724,8 @@
   <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
   <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
-  <script defer src="./1_App/js/onedrive-storage.js?v=40"></script>
+  <script defer src="./1_App/js/onedrive-storage.js?v=41"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=40"></script>
+  <script defer src="./1_App/js/app.js?v=41"></script>
 </body>
 </html>
