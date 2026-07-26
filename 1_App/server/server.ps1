@@ -423,7 +423,7 @@ if ($null -eq $Listener) {
 # 起動URLを作ります。
 $StartUrl = "http://127.0.0.1:$Port/Basketball_Tactics_Board.html"
 # 起動案内を表示します。
-Write-Host "Basketball Tactics Board v20" -ForegroundColor Cyan
+Write-Host "ZEROONE CANVAS" -ForegroundColor Cyan
 # 保存フォルダを表示します。
 Write-Host "作戦データ: $DataFullPath"
 # 終了方法を表示します。

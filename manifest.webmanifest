@@ -1,7 +1,7 @@
 {
-  "name": "Basketball Tactics Board",
-  "short_name": "Tactics Board",
-  "description": "iPad・PCで使えるバスケットボール作戦ボード",
+  "name": "ZEROONE CANVAS｜動くバスケ作戦キャンバス",
+  "short_name": "ZEROONE",
+  "description": "問いからプレーをつくる、動くバスケ作戦キャンバス",
   "id": "./index.html",
   "start_url": "./index.html",
   "scope": "./",

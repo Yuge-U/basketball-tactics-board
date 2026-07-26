@@ -19,7 +19,7 @@ https://GitHubユーザー名.github.io/basketball-tactics-board/
 1. `https://entra.microsoft.com/` を開き、Microsoftアカウントでサインインします。
 2. 「ID」→「アプリケーション」→「アプリの登録」を開きます。
 3. 「新規登録」を押します。
-4. 名前を `Basketball Tactics Board` にします。
+4. 名前を `ZEROONE CANVAS` にします。既存のアプリ登録は旧名称のままでも動作します。
 5. サポートされているアカウントの種類は、個人用Microsoftアカウントを含む項目を選びます。
    - 個人だけで使う場合：「個人用Microsoftアカウントのみ」
    - その項目がない場合：「任意の組織ディレクトリ内のアカウントと個人用Microsoftアカウント」
@@ -77,7 +77,9 @@ GitHub上で直接編集する場合は、対象ファイルを開いて鉛筆�
 OneDrive内に次の場所が自動作成されます。
 
 ```text
-アプリ / Basketball Tactics Board /
+アプリ / Basketball Tactics Board /（既存登録）
+または
+アプリ / ZEROONE CANVAS /（新規登録）
 ```
 
 その中へ `Shared`、`U12`、`U15` などの分類フォルダと作戦JSONが保存されます。
