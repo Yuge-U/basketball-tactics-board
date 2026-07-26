@@ -1,5 +1,5 @@
-# Basketball Tactics Board v21
+# Basketball Tactics Board v41
 
-GitHub Pages公開用です。画面・操作・機能はv20系を維持し、公開時のファイル数制約に合わせてアプリ本体を圧縮・分割しています。
+バスケットボールの作戦を作成・保存・再生できる、個人利用向けのGitHub Pages版作戦ボードです。
 
-作戦データはGitHubへ置かず、WindowsではOneDrive同期フォルダ、iPadでは「JSON保存」「JSON読込」からOneDriveを利用してください。
+作戦データはGitHubへ保存されません。OneDriveへ接続すると、作戦JSON・動画素材・保存フォルダ設定をPC、iPad、iPhoneなどの端末間で共有できます。JSONの保存・読込と一括バックアップにも対応しています。
