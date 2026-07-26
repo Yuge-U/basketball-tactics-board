@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 15;
+const SCHEMA_VERSION = 16;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -135,6 +135,12 @@ const TEXT_FONTS = {
 function normalizeTextFont(value) {
   return TEXT_FONTS[value] ? value : "gothic";
 }
+
+// コート向きを0度または180度へ補正します。
+function normalizeCourtRotation(value) {
+  return Number(value) === 180 ? 180 : 0;
+}
+
 // 自動保存に使うキーを定義します。
 const AUTOSAVE_KEY = "basketball-tactics-autosave-v1";
 // 容量の大きい取込動画を端末内へ保存するIndexedDB名です。
@@ -145,7 +151,7 @@ const LIBRARY_KEY = "basketball-tactics-library-v1";
 // モバイル表示の選択を端末ごとに保持するキーです。
 const MOBILE_LAYOUT_KEY = "basketball-tactics-mobile-layout-v1";
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v38";
+const APP_VERSION = "v39";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -363,6 +369,10 @@ const refreshLibraryButton = document.getElementById("refreshLibraryButton");
 const folderModeMessage = document.getElementById("folderModeMessage");
 const oneDriveDialog = document.getElementById("oneDriveDialog");
 const oneDriveButton = document.getElementById("oneDriveButton");
+const settingsDialog = document.getElementById("settingsDialog");
+const settingsButton = document.getElementById("settingsButton");
+const rotateCourtButton = document.getElementById("rotateCourtButton");
+const focusRotateCourtButton = document.getElementById("focusRotateCourtButton");
 const oneDriveConnectionCard = document.getElementById("oneDriveConnectionCard");
 const oneDriveConnectionTitle = document.getElementById("oneDriveConnectionTitle");
 const oneDriveConnectionDetail = document.getElementById("oneDriveConnectionDetail");
@@ -846,6 +856,7 @@ function createInitialState() {
     playName: "new play",
     libraryMeta: { folder: "Shared", tags: [], favorite: false },
     courtMode: "half",
+    courtRotation: 0,
     activeTool: "select",
     activeLineColor: "black",
     activeTextFont: "gothic",
@@ -924,6 +935,8 @@ function createSnapshot() {
     libraryMeta: state.libraryMeta ?? { folder: "Shared", tags: [], favorite: false },
     // コート種別を保存します。
     courtMode: state.courtMode,
+    // コートの攻撃方向を保存します。
+    courtRotation: normalizeCourtRotation(state.courtRotation),
     // 選択中の線色を保存します。
     activeLineColor: state.activeLineColor,
     // 新しく配置するテキストのフォントを保存します。
@@ -1112,6 +1125,8 @@ function migrateSnapshot(snapshot) {
   migrated.playbackSpeed = normalizeSpeed(migrated.playbackSpeed);
   // 移動線表示設定を補います。
   migrated.showMovementLines = migrated.showMovementLines !== false;
+  // 旧版データは従来どおり0度、対応データは0度または180度へ補正します。
+  migrated.courtRotation = normalizeCourtRotation(migrated.courtRotation);
   // ライブラリ管理情報を補います。
   migrated.libraryMeta = migrated.libraryMeta ?? { folder: "Shared", tags: [], favorite: false };
   migrated.libraryMeta.folder = String(migrated.libraryMeta.folder || "Shared");
@@ -1143,6 +1158,8 @@ function applySnapshot(snapshot) {
   syncFavoriteHint();
   // コート種別を復元します。
   state.courtMode = migrated.courtMode ?? "half";
+  // コートの攻撃方向を復元します。
+  state.courtRotation = normalizeCourtRotation(migrated.courtRotation);
   // 選択中の線色を復元します。
   state.activeLineColor = migrated.activeLineColor ?? "black";
   // 新しく配置するテキストのフォントを復元します。
@@ -1451,6 +1468,13 @@ function getPlaybackBall(ball, stepId) {
 function drawCourt(ctx) {
   // 現在のコートサイズを取得します。
   const size = getCourtSize();
+  // コート線だけを回転できるよう描画状態を保存します。
+  ctx.save();
+  // 反対方向の場合はコート中心を基準に180度回転します。
+  if (normalizeCourtRotation(state.courtRotation) === 180) {
+    ctx.translate(size.width, size.height);
+    ctx.rotate(Math.PI);
+  }
   // 木目色で背景を塗ります。
   ctx.fillStyle = "#d7a760";
   // コート全面を塗ります。
@@ -1473,6 +1497,8 @@ function drawCourt(ctx) {
     // FIBA全面コートを描きます。
     drawFullCourtFiba(ctx, size);
   }
+  // 選手番号やテキストは読みやすい向きを保つため、コート線の回転だけを解除します。
+  ctx.restore();
 }
 
 // 木目の板目を控えめに描きます。
@@ -3710,6 +3736,61 @@ function changeCourtMode(mode) {
   resizeCanvas();
 }
 
+// 1つの座標を現在コートの中心を基準に180度回転します。
+function rotatePointForCourt(point, size, rotatedPoints) {
+  if (!point || typeof point !== "object" || rotatedPoints.has(point)) {
+    return;
+  }
+  rotatedPoints.add(point);
+  point.x = size.width - Number(point.x || 0);
+  point.y = size.height - Number(point.y || 0);
+}
+
+// 現在のコート方向に合わせて、新しく追加する要素の初期位置を返します。
+function orientNewPointForCourt(point, size = getCourtSize()) {
+  if (normalizeCourtRotation(state.courtRotation) !== 180) {
+    return point;
+  }
+  return {
+    x: size.width - Number(point.x || 0),
+    y: size.height - Number(point.y || 0)
+  };
+}
+
+// コートと全STEPの配置・動作を同じ向きへ180度回転します。
+function rotateCourtAndPlay() {
+  // 再生途中の一時座標が混ざらないよう先に停止します。
+  if (playbackTimer) {
+    stopPlayback(false);
+  }
+  playbackVisual = null;
+  framePlayback = null;
+  drawSession = null;
+  dragSession = null;
+  selectedCanvasItem = null;
+  const size = getCourtSize();
+  commitMutation(() => {
+    // コート線の表示方向を反転します。
+    state.courtRotation = normalizeCourtRotation(state.courtRotation) === 180 ? 0 : 180;
+    // 同一座標オブジェクトが複数箇所から参照されていても1回だけ回転します。
+    const rotatedPoints = new Set();
+    state.steps.forEach((step) => {
+      (step.players ?? []).forEach((player) => rotatePointForCourt(player, size, rotatedPoints));
+      rotatePointForCourt(step.ball, size, rotatedPoints);
+      (step.cones ?? []).forEach((cone) => rotatePointForCourt(cone, size, rotatedPoints));
+      (step.lines ?? []).forEach((line) => {
+        rotatePointForCourt(line.start, size, rotatedPoints);
+        rotatePointForCourt(line.end, size, rotatedPoints);
+        (line.points ?? []).forEach((point) => rotatePointForCourt(point, size, rotatedPoints));
+      });
+      // 文字・画像・動画は位置だけを回転し、読みやすい表示角度は維持します。
+      (step.texts ?? []).forEach((textItem) => rotatePointForCourt(textItem, size, rotatedPoints));
+      (step.media ?? []).forEach((mediaItem) => rotatePointForCourt(mediaItem, size, rotatedPoints));
+    });
+  });
+  showToast(state.courtRotation === 180 ? "コートと全STEPを反対方向へ揃えました" : "コートと全STEPを元の方向へ戻しました");
+}
+
 // 新しいコーンの初期位置を返します。
 function getDefaultConePosition(color) {
   // 現在のコートサイズを取得します。
@@ -3722,8 +3803,9 @@ function getDefaultConePosition(color) {
   const row = Math.floor(count / 5);
   // 赤と青で初期配置する左右位置を分けます。
   const baseX = color === "blue" ? size.width * 0.68 : size.width * 0.18;
-  // 重ならない初期位置を返します。
-  return clampPoint({ x: baseX + column * 48, y: size.height * 0.82 - row * 52 }, Math.max(CONE_WIDTH, CONE_HEIGHT) / 2 + 4);
+  // 回転中のコートでも攻める方向へ揃え、コート内へ収めた初期位置を返します。
+  const point = orientNewPointForCourt({ x: baseX + column * 48, y: size.height * 0.82 - row * 52 }, size);
+  return clampPoint(point, Math.max(CONE_WIDTH, CONE_HEIGHT) / 2 + 4);
 }
 
 // 現在STEPへ赤または青のコーンを追加します。
@@ -3773,8 +3855,9 @@ function getDefaultPlayerPosition(side, number) {
   const baseYRatio = side === "offense" ? 0.9 : 0.62;
   // 同じ側の番号を3段へ配置するY比率を計算します。
   const yRatio = baseYRatio - row * 0.08;
-  // コート内へ収めた初期位置を返します。
-  return clampPoint({ x: size.width * xRatio, y: size.height * yRatio }, getPlayerRadius() + 4);
+  // 回転中のコートでも攻める方向へ揃え、コート内へ収めた初期位置を返します。
+  const point = orientNewPointForCourt({ x: size.width * xRatio, y: size.height * yRatio }, size);
+  return clampPoint(point, getPlayerRadius() + 4);
 }
 
 // 現在STEPの選手番号を追加または削除します。
@@ -5119,6 +5202,13 @@ function openOneDriveSettings() {
   if (!oneDriveDialog.open) oneDriveDialog.showModal();
 }
 
+// 歯車アイコンからOneDrive以外のアプリ設定を表示します。
+function openAppSettings() {
+  updateOneDriveInterface();
+  updateTermsAgreementDisplay();
+  if (!settingsDialog.open) settingsDialog.showModal();
+}
+
 // OneDriveの接続状態を画面へ反映します。
 function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.() || {}) {
   const configured = Boolean(nextStatus.configured);
@@ -5150,7 +5240,7 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
   }
 
   if (oneDriveButton) {
-    const buttonHint = connected ? "設定を開く（OneDrive接続中）" : "設定を開く";
+    const buttonHint = connected ? "OneDrive接続中・設定を開く" : "OneDrive設定を開く";
     oneDriveButton.textContent = "☁";
     oneDriveButton.setAttribute("aria-label", buttonHint);
     oneDriveButton.title = buttonHint;
@@ -5205,6 +5295,7 @@ function openTermsDialog(required = false) {
   const record = readStoredRecord(TERMS_STORAGE_KEY);
   termsRequired = required;
   if (oneDriveDialog?.open) oneDriveDialog.close();
+  if (settingsDialog?.open) settingsDialog.close();
   closeTermsButton.hidden = required;
   termsAcceptCheckbox.checked = record?.version === TERMS_VERSION;
   instagramFollowedCheckbox.checked = Boolean(record?.instagramFollowed);
@@ -5230,6 +5321,7 @@ function renderGuidePage() {
 
 function openGuide() {
   if (oneDriveDialog?.open) oneDriveDialog.close();
+  if (settingsDialog?.open) settingsDialog.close();
   guidePageIndex = 0;
   renderGuidePage();
   if (!guideDialog.open) guideDialog.showModal();
@@ -6073,6 +6165,14 @@ function syncInterface(save = true) {
   document.getElementById("halfCourtButton").classList.toggle("active", state.courtMode === "half");
   // 全面ボタン状態を同期します。
   document.getElementById("fullCourtButton").classList.toggle("active", state.courtMode === "full");
+  // 通常表示と最大表示の回転ボタンへ現在方向を同期します。
+  [rotateCourtButton, focusRotateCourtButton].forEach((button) => {
+    if (!button) return;
+    const rotated = normalizeCourtRotation(state.courtRotation) === 180;
+    button.classList.toggle("rotation-active", rotated);
+    button.setAttribute("aria-pressed", String(rotated));
+    button.title = rotated ? "コートと全STEPを元の方向へ戻す" : "コートと全STEPを180度回転";
+  });
   // STEP一覧を更新します。
   renderStepList();
   // 最大表示用STEP一覧を更新します。
@@ -6306,8 +6406,12 @@ document.getElementById("redoButton").addEventListener("click", redo);
 document.getElementById("clearLinesButton").addEventListener("click", clearLines);
 // コート最大化ボタンを登録します。
 document.getElementById("maximizeCourtButton").addEventListener("click", () => setFocusMode(true));
+// 通常表示のコート回転ボタンを登録します。
+rotateCourtButton?.addEventListener("click", rotateCourtAndPlay);
 // 最大表示終了ボタンを登録します。
 document.getElementById("exitFocusButton").addEventListener("click", () => setFocusMode(false));
+// 最大表示のコート回転ボタンを登録します。
+focusRotateCourtButton?.addEventListener("click", rotateCourtAndPlay);
 // 最大表示用の再生ボタンを登録します。
 focusPlayButton.addEventListener("click", playSteps);
 // 最大表示用の一つ前ボタンを登録します。
@@ -6380,6 +6484,9 @@ exportVideoButton?.addEventListener("click", exportPlaybackVideo);
 if (connectFolderButton) connectFolderButton.addEventListener("click", openOneDriveSettings);
 if (oneDriveButton) oneDriveButton.addEventListener("click", openOneDriveSettings);
 document.getElementById("closeOneDriveButton")?.addEventListener("click", () => oneDriveDialog.close());
+// 歯車アイコンからアプリ設定を開閉します。
+settingsButton?.addEventListener("click", openAppSettings);
+document.getElementById("closeSettingsButton")?.addEventListener("click", () => settingsDialog.close());
 
 // 詳細設定から明示的に選んだ場合だけクライアントID入力欄を表示します。
 changeOneDriveClientIdButton?.addEventListener("click", () => {

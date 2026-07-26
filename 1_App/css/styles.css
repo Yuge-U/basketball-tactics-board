@@ -902,6 +902,13 @@ button:disabled {
   font-weight: 800;
 }
 
+/* コートが反対方向のときは回転アイコンだけを控えめに強調します。 */
+.icon-button.rotation-active {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
 .text-outline-selector button.active {
   color: #ffffff;
   background: var(--primary);
@@ -1016,6 +1023,11 @@ button:disabled {
 /* 再生も他の最大表示操作と同じ薄いアイコンにします。 */
 .focus-button.primary {
   background: rgba(29, 78, 216, 0.36);
+}
+
+.focus-button.rotation-active {
+  opacity: 0.72;
+  background: rgba(29, 78, 216, 0.55);
 }
 
 .focus-button:hover,

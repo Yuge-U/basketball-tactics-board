@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=38" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=39" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>Basketball Tactics Board</title>
 </head>
@@ -78,6 +78,8 @@
         </button>
         <!-- 個人用OneDriveの接続状態と設定を開きます。 -->
         <button id="oneDriveButton" class="button onedrive-button icon-only-button top-action-icon" type="button" aria-label="OneDrive設定" title="OneDrive設定">☁</button>
+        <!-- バックアップ・ガイド・利用規約などのアプリ設定を開きます。 -->
+        <button id="settingsButton" class="button icon-only-button top-action-icon" type="button" aria-label="設定を開く" title="設定を開く">⚙</button>
         <!-- 現在の作戦データをJSONファイルへ書き出します。 -->
         <button id="exportJsonButton" class="button icon-only-button top-action-icon code-icon" type="button" aria-label="JSONを保存" title="JSONを保存">{↓}</button>
         <!-- JSONファイルから作戦データを読み込みます。 -->
@@ -188,6 +190,7 @@
             <button id="undoButton" class="icon-button" type="button" aria-label="元に戻す" title="元に戻す">↶</button>
             <button id="redoButton" class="icon-button" type="button" aria-label="やり直す" title="やり直す">↷</button>
             <button id="clearLinesButton" class="icon-button" type="button" aria-label="線を消去" title="線を消去">⌫</button>
+            <button id="rotateCourtButton" class="icon-button" type="button" aria-label="コートを180度回転" title="コートと全STEPを180度回転" aria-pressed="false">↻</button>
             <button id="maximizeCourtButton" class="icon-button" type="button" aria-label="コートを最大表示" title="コートを最大表示">⛶</button>
             <button id="resetButton" class="icon-button danger" type="button" aria-label="初期化" title="初期化">↺</button>
           </div>
@@ -203,6 +206,8 @@
           <div id="focusControls" class="focus-controls" aria-label="最大表示の操作">
             <!-- 最大表示を終了します。 -->
             <button id="exitFocusButton" class="focus-button" type="button" aria-label="最大表示を閉じる" title="最大表示を閉じる">×</button>
+            <!-- コートと全STEPを同時に回転します。 -->
+            <button id="focusRotateCourtButton" class="focus-button" type="button" aria-label="コートを180度回転" title="コートと全STEPを180度回転" aria-pressed="false">↻</button>
             <!-- 一つ前の動作またはSTEPへ戻ります。 -->
             <button id="focusPreviousFrameButton" class="focus-button" type="button" aria-label="前へ" title="前へ">⏮</button>
             <!-- 最大表示のまま全STEPを連続再生します。 -->
@@ -472,16 +477,16 @@
     <div id="libraryList" class="library-list"></div>
   </dialog>
 
-  <!-- 個人配布版の設定ダイアログです。既存のIDを維持して呼び出し互換性を保ちます。 -->
+  <!-- 個人用OneDriveの接続と詳細設定ダイアログです。 -->
   <dialog id="oneDriveDialog" class="library-dialog onedrive-dialog">
     <div class="dialog-header">
       <div>
-        <p class="eyebrow">APP SETTINGS</p>
-        <h2>設定</h2>
+        <p class="eyebrow">PERSONAL CLOUD</p>
+        <h2>個人用OneDrive</h2>
       </div>
       <button id="closeOneDriveButton" class="icon-button" type="button" aria-label="閉じる">×</button>
     </div>
-    <div class="onedrive-content settings-content">
+    <div class="onedrive-content">
       <section class="settings-section" aria-labelledby="oneDriveSettingsTitle">
         <h3 id="oneDriveSettingsTitle">OneDrive</h3>
         <div id="oneDriveConnectionCard" class="onedrive-status-card" aria-live="polite">
@@ -496,37 +501,6 @@
           <button id="disconnectOneDriveButton" class="button" type="button" hidden>接続を解除</button>
         </div>
         <p class="onedrive-privacy">作戦JSONと取り込んだ動画は、接続した本人のOneDrive内にある「アプリ」専用フォルダへ保存されます。作戦を削除しても、関連動画は誤削除を防ぐため残します。</p>
-      </section>
-
-      <section class="settings-section" aria-labelledby="backupSettingsTitle">
-        <h3 id="backupSettingsTitle">バックアップと復元</h3>
-        <p>大切な作戦データは、定期的に一括バックアップしてください。</p>
-        <label class="onedrive-field" for="restoreConflictMode">
-          <span>同名作戦がある場合</span>
-          <select id="restoreConflictMode">
-            <option value="overwrite">上書き</option>
-            <option value="rename">別名で保存</option>
-            <option value="skip">スキップ</option>
-          </select>
-        </label>
-        <div class="settings-action-row">
-          <button id="bulkBackupButton" class="button primary" type="button">一括バックアップ</button>
-          <button id="bulkRestoreButton" class="button" type="button">一括復元</button>
-          <input id="bulkRestoreInput" type="file" accept=".json,application/json" hidden />
-        </div>
-        <p id="bulkTransferStatus" class="settings-status" role="status" aria-live="polite"></p>
-      </section>
-
-      <section class="settings-section compact-settings-section">
-        <h3>操作ガイド</h3>
-        <button id="openGuideButton" class="button" type="button">操作ガイドを見る</button>
-      </section>
-
-      <section class="settings-section compact-settings-section">
-        <h3>利用規約</h3>
-        <p>現在のバージョン：<strong id="currentTermsVersion">—</strong></p>
-        <p id="termsAgreementStatus">未同意</p>
-        <button id="openTermsButton" class="button" type="button">利用規約を見る</button>
       </section>
 
       <details class="settings-section settings-details">
@@ -558,6 +532,50 @@
           <a class="button link-button" href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer">Microsoft Entraを開く</a>
         </details>
       </details>
+
+    </div>
+  </dialog>
+
+  <!-- OneDriveとは独立した歯車アイコンのアプリ設定ダイアログです。 -->
+  <dialog id="settingsDialog" class="library-dialog onedrive-dialog settings-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="eyebrow">APP SETTINGS</p>
+        <h2>設定</h2>
+      </div>
+      <button id="closeSettingsButton" class="icon-button" type="button" aria-label="閉じる">×</button>
+    </div>
+    <div class="onedrive-content settings-content">
+      <section class="settings-section" aria-labelledby="backupSettingsTitle">
+        <h3 id="backupSettingsTitle">バックアップと復元</h3>
+        <p>大切な作戦データは、定期的に一括バックアップしてください。</p>
+        <label class="onedrive-field" for="restoreConflictMode">
+          <span>同名作戦がある場合</span>
+          <select id="restoreConflictMode">
+            <option value="overwrite">上書き</option>
+            <option value="rename">別名で保存</option>
+            <option value="skip">スキップ</option>
+          </select>
+        </label>
+        <div class="settings-action-row">
+          <button id="bulkBackupButton" class="button primary" type="button">一括バックアップ</button>
+          <button id="bulkRestoreButton" class="button" type="button">一括復元</button>
+          <input id="bulkRestoreInput" type="file" accept=".json,application/json" hidden />
+        </div>
+        <p id="bulkTransferStatus" class="settings-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="settings-section compact-settings-section">
+        <h3>操作ガイド</h3>
+        <button id="openGuideButton" class="button" type="button">操作ガイドを見る</button>
+      </section>
+
+      <section class="settings-section compact-settings-section">
+        <h3>利用規約</h3>
+        <p>現在のバージョン：<strong id="currentTermsVersion">—</strong></p>
+        <p id="termsAgreementStatus">未同意</p>
+        <button id="openTermsButton" class="button" type="button">利用規約を見る</button>
+      </section>
 
       <section class="settings-section compact-settings-section app-info-section">
         <h3>アプリ情報</h3>
@@ -680,8 +698,8 @@
   <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
   <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
-  <script defer src="./1_App/js/onedrive-storage.js?v=38"></script>
+  <script defer src="./1_App/js/onedrive-storage.js?v=39"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=38"></script>
+  <script defer src="./1_App/js/app.js?v=39"></script>
 </body>
 </html>
