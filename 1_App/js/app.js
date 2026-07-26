@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -456,6 +456,23 @@ let playerNumberDetailsVisible = false;
 // コマ送り再生の現在位置を保持します。
 let framePlayback = null;
 
+// 読込中・再生中の素材要素と一時URLを安全に破棄します。
+function clearMediaElementCache() {
+  mediaElementCache.forEach((entry) => {
+    if (entry.element?.tagName === "VIDEO") {
+      entry.element.pause();
+    }
+    if (entry.url) {
+      URL.revokeObjectURL(entry.url);
+    }
+  });
+  mediaElementCache.clear();
+  if (mediaRenderFrame) {
+    window.cancelAnimationFrame(mediaRenderFrame);
+    mediaRenderFrame = null;
+  }
+}
+
 // 一意なIDを作ります。
 function makeId(prefix) {
   // 現在時刻と乱数を組み合わせて返します。
@@ -508,6 +525,89 @@ async function loadMediaBlob(assetId) {
   } finally {
     database.close();
   }
+}
+
+// 保存先フォルダー名をOneDrive比較用に統一します。
+function normalizeOneDriveFolder(folder) {
+  return String(folder || "Shared").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "") || "Shared";
+}
+
+// 動画に保存されたOneDrive参照のフォルダー名を返します。
+function getRemoteMediaFolder(mediaItem) {
+  const remote = mediaItem?.remote;
+  if (remote?.folder) {
+    return normalizeOneDriveFolder(remote.folder);
+  }
+  const parts = String(remote?.relativePath || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").split("/");
+  parts.pop();
+  return normalizeOneDriveFolder(parts.join("/"));
+}
+
+// 端末内キャッシュ、なければOneDriveから動画Blobを取得します。
+async function resolveVideoBlob(mediaItem) {
+  let blob = null;
+  if (mediaItem?.assetId) {
+    try {
+      blob = await loadMediaBlob(mediaItem.assetId);
+    } catch (error) {
+      console.warn("端末内の動画キャッシュを読み込めませんでした。", error);
+    }
+  }
+  const remoteItemId = mediaItem?.remote?.itemId;
+  if (!blob && remoteItemId) {
+    if (!window.OneDriveStorage?.isConnected()) {
+      throw new Error("動画を表示するにはOneDriveへ接続してください");
+    }
+    blob = await window.OneDriveStorage.loadMedia(remoteItemId);
+    if (blob && mediaItem.assetId) {
+      try {
+        await saveMediaBlob(mediaItem.assetId, blob);
+      } catch (error) {
+        // 端末キャッシュへ保存できなくても、今回取得した動画はそのまま表示します。
+        console.warn("OneDrive動画を端末へキャッシュできませんでした。", error);
+      }
+    }
+  }
+  return blob;
+}
+
+// 現在作戦の動画をOneDriveへ同期し、各動画へリモート参照を記録します。
+async function syncVideosToOneDrive(folder, playName) {
+  const targetFolder = normalizeOneDriveFolder(folder);
+  const allVideos = state.steps.flatMap((step) => (step.media || []).filter((mediaItem) => mediaItem.type === "video"));
+  if (allVideos.length === 0) {
+    return { uploaded: 0, total: 0 };
+  }
+  const groups = new Map();
+  allVideos.forEach((mediaItem) => {
+    const key = mediaItem.assetId || mediaItem.remote?.itemId || mediaItem.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(mediaItem);
+  });
+  let uploaded = 0;
+  let index = 0;
+  for (const group of groups.values()) {
+    index += 1;
+    const representative = group.find((mediaItem) => mediaItem.remote?.itemId) || group[0];
+    const matchingRemote = group.find((mediaItem) => mediaItem.remote?.itemId && getRemoteMediaFolder(mediaItem) === targetFolder)?.remote;
+    if (matchingRemote) {
+      group.forEach((mediaItem) => {
+        mediaItem.remote = { ...matchingRemote };
+      });
+      continue;
+    }
+    showToast(`動画をOneDriveへ保存中… ${index}/${groups.size}`);
+    const blob = await resolveVideoBlob(representative);
+    if (!blob) {
+      throw new Error(`「${representative.name || "動画"}」の動画本体が見つかりません。元の端末で動画を再度取り込んでください。`);
+    }
+    const remote = await window.OneDriveStorage.saveMedia(targetFolder, playName, representative, blob);
+    group.forEach((mediaItem) => {
+      mediaItem.remote = { ...remote };
+    });
+    uploaded += 1;
+  }
+  return { uploaded, total: groups.size };
 }
 
 // Fileを一時URLで読み込み、画像または動画の縦横寸法を取得します。
@@ -612,6 +712,7 @@ async function importMediaFile(event, type) {
       mimeType: file.type,
       src: source,
       assetId,
+      remote: null,
       x: court.width / 2,
       y: court.height / 2,
       width: display.width,
@@ -848,6 +949,19 @@ function migrateSnapshot(snapshot) {
       mediaItem.width = Math.max(40, Number(mediaItem.width) || 260);
       mediaItem.height = Math.max(40, Number(mediaItem.height) || 160);
       mediaItem.rotation = Number(mediaItem.rotation) || 0;
+      if (mediaItem.remote?.itemId) {
+        mediaItem.remote = {
+          provider: "onedrive",
+          itemId: String(mediaItem.remote.itemId),
+          fileName: String(mediaItem.remote.fileName || mediaItem.name || "video"),
+          relativePath: String(mediaItem.remote.relativePath || ""),
+          folder: normalizeOneDriveFolder(mediaItem.remote.folder || getRemoteMediaFolder(mediaItem)),
+          size: Math.max(0, Number(mediaItem.remote.size) || 0),
+          mimeType: String(mediaItem.remote.mimeType || mediaItem.mimeType || "video/mp4")
+        };
+      } else {
+        mediaItem.remote = null;
+      }
     });
     // 旧版の線へ黒色を補います。
     step.lines.forEach((line) => {
@@ -894,6 +1008,8 @@ function migrateSnapshot(snapshot) {
 function applySnapshot(snapshot) {
   // 読込・履歴操作時は素材選択枠を解除します。
   selectedCanvasItem = null;
+  // 前の作戦の動画要素と一時URLを破棄します。
+  clearMediaElementCache();
   // 最大表示中のSTEP一覧の一時的な表示切替は履歴や保存データとは分離します。
   const focusStepsVisible = isFocusMode ? state.focusShowSteps : false;
   // 旧版データを含めて現行形式へ変換します。
@@ -1918,9 +2034,9 @@ function ensureMediaElement(mediaItem) {
   entry.ready = (async () => {
     try {
       if (mediaItem.type === "video") {
-        const blob = await loadMediaBlob(mediaItem.assetId);
+        const blob = await resolveVideoBlob(mediaItem);
         if (!blob) {
-          throw new Error("動画ファイルはこの端末にありません");
+          throw new Error("動画ファイルが端末またはOneDriveにありません");
         }
         entry.url = URL.createObjectURL(blob);
         const video = document.createElement("video");
@@ -4514,6 +4630,8 @@ function resetBoard() {
   const fresh = createInitialState();
   // 選択中ツールは維持します。
   fresh.activeTool = state.activeTool;
+  // 現在の動画再生と一時URLを破棄します。
+  clearMediaElementCache();
   // 状態を置き換えます。
   state = fresh;
   // 素材選択状態を解除します。
@@ -4825,7 +4943,7 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
   oneDriveConnectionCard?.classList.toggle("error", Boolean(errorMessage));
   if (connected) {
     oneDriveConnectionTitle.textContent = "OneDriveへ接続済み";
-    oneDriveConnectionDetail.textContent = `${accountLabel} の専用アプリフォルダへ保存します。`;
+    oneDriveConnectionDetail.textContent = `${accountLabel} の専用アプリフォルダへ作戦JSONと動画を保存します。`;
   } else if (errorMessage) {
     oneDriveConnectionTitle.textContent = "接続を確認してください";
     oneDriveConnectionDetail.textContent = errorMessage;
@@ -4851,7 +4969,7 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
   if (disconnectOneDriveButton) disconnectOneDriveButton.hidden = !connected;
   if (folderModeMessage) {
     folderModeMessage.textContent = connected
-      ? `個人用OneDriveへ接続中：${accountLabel}`
+      ? `個人用OneDriveへ接続中：${accountLabel}（作戦JSON・動画を端末間で共有）`
       : configured
         ? "OneDriveへ接続すると、すべての端末で同じ作戦を開けます。"
         : "OneDrive保存を使うには初回設定を完了してください。";
@@ -4959,10 +5077,14 @@ async function savePlayToLibrary() {
         showToast("保存をキャンセルしました");
         return;
       }
+      const videoSync = await syncVideosToOneDrive(state.libraryMeta.folder, name);
       const payload = createExportPayload();
       const result = await window.OneDriveStorage.save(state.libraryMeta.folder, name, payload);
       autosave();
-      showToast(`OneDriveへ保存しました：${result.relativePath}`);
+      const videoMessage = videoSync.total > 0
+        ? `（動画${videoSync.total}件を同期${videoSync.uploaded > 0 ? `・新規${videoSync.uploaded}件` : ""}）`
+        : "";
+      showToast(`OneDriveへ保存しました${videoMessage}：${result.relativePath}`);
       return;
     } catch (error) {
       console.error("OneDriveへの保存に失敗しました。", error);
@@ -5318,7 +5440,10 @@ async function loadLibraryItem(item) {
 // 保存済み作戦を削除します。
 async function deleteLibraryItem(item) {
   // 削除確認でキャンセルされた場合は終了します。
-  if (!window.confirm(`「${item.name}」を削除しますか？`)) {
+  const deleteMessage = item.source === "onedrive"
+    ? `「${item.name}」の作戦JSONを削除しますか？\n\n関連する動画ファイルは誤削除を防ぐためOneDriveに残します。`
+    : `「${item.name}」を削除しますか？`;
+  if (!window.confirm(deleteMessage)) {
     // 処理を終了します。
     return;
   }
@@ -5347,7 +5472,9 @@ async function deleteLibraryItem(item) {
     // 一覧を再描画します。
     await renderLibrary();
     // 結果を通知します。
-    showToast("保存済み作戦を削除しました");
+    showToast(item.source === "onedrive"
+      ? "作戦JSONを削除しました（関連動画はOneDriveに残しています）"
+      : "保存済み作戦を削除しました");
   } catch (error) {
     // エラー内容を記録します。
     console.error("保存済み作戦を削除できませんでした。", error);

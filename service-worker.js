@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v34-focus-media-tools";
+const CACHE_NAME = "basketball-tactics-board-v35-onedrive-video-assets";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

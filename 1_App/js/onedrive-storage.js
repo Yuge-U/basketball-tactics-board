@@ -213,6 +213,7 @@ window.OneDriveStorage = (() => {
     }
     if (responseType === "none" || response.status === 204) return null;
     if (responseType === "text") return response.text();
+    if (responseType === "blob") return response.blob();
     return response.json();
   }
 
@@ -291,6 +292,59 @@ window.OneDriveStorage = (() => {
     };
   }
 
+  function mediaExtension(media) {
+    const originalName = String(media?.name || "");
+    const originalExtension = originalName.match(/\.([a-z0-9]{1,10})$/i)?.[1];
+    if (originalExtension) return originalExtension.toLowerCase();
+    const mimeType = String(media?.mimeType || "").toLowerCase();
+    if (mimeType.includes("quicktime")) return "mov";
+    if (mimeType.includes("webm")) return "webm";
+    if (mimeType.includes("x-m4v")) return "m4v";
+    return "mp4";
+  }
+
+  function mediaFileName(playName, media) {
+    const safePlayName = safeFileName(playName).slice(0, 72);
+    const assetKey = String(media?.assetId || media?.id || Date.now())
+      .replace(/[^a-z0-9_-]/gi, "")
+      .slice(-40) || String(Date.now());
+    return `${safePlayName}__video-${assetKey}.${mediaExtension(media)}`;
+  }
+
+  async function saveMedia(folder, playName, media, blob) {
+    if (!(blob instanceof Blob)) {
+      throw new OneDriveError("missing-media", "アップロードする動画データが見つかりません。");
+    }
+    const targetFolder = await ensureFolderPath(folder);
+    const filename = mediaFileName(playName, media);
+    const mimeType = String(media?.mimeType || blob.type || "application/octet-stream");
+    const uploaded = await graphRequest(
+      `/me/drive/items/${encodeURIComponent(targetFolder.id)}:/${encodeURIComponent(filename)}:/content`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": mimeType },
+        body: blob
+      }
+    );
+    const normalizedFolder = String(folder || "Shared").replace(/^\/+|\/+$/g, "") || "Shared";
+    return {
+      provider: "onedrive",
+      itemId: uploaded.id,
+      fileName: uploaded.name || filename,
+      relativePath: `${normalizedFolder}/${uploaded.name || filename}`,
+      folder: normalizedFolder,
+      size: Number(uploaded.size ?? blob.size ?? 0),
+      mimeType
+    };
+  }
+
+  async function loadMedia(itemId) {
+    if (!itemId) {
+      throw new OneDriveError("missing-media-id", "動画のOneDriveファイルIDがありません。");
+    }
+    return graphRequest(`/me/drive/items/${encodeURIComponent(itemId)}/content`, {}, "blob");
+  }
+
   async function collectFiles(parentId, prefix = "") {
     const children = await listChildren(parentId);
     const files = [];
@@ -353,6 +407,8 @@ window.OneDriveStorage = (() => {
     signIn,
     signOut,
     save,
+    saveMedia,
+    loadMedia,
     list,
     load,
     remove,
