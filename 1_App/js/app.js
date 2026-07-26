@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -37,8 +37,8 @@ function normalizePlayerSize(value) {
     // 有効なサイズ名を返します。
     return value;
   }
-  // 未定義の場合は従来サイズの大へ戻します。
-  return "large";
+  // 未定義の場合は標準サイズの中へ戻します。
+  return "medium";
 }
 
 // 現在選択中の選手表示設定を返します。
@@ -75,14 +75,23 @@ function normalizeSpeed(value) {
   // 0.25刻みに丸めて最小値と最大値の範囲へ収めます。
   return Math.max(MIN_SPEED, Math.min(MAX_SPEED, Math.round(parsed * 4) / 4));
 }
-// 旧フルコート側の見た目に合わせた表示上の半径です。
-const BALL_DISPLAY_RADIUS = 13;
+// ボールの大・中・小サイズを定義します。従来サイズを大として扱います。
+const BALL_SIZES = {
+  large: 13,
+  medium: 10,
+  small: 8
+};
+
+// ボールサイズ名を利用可能な値へ補正します。
+function normalizeBallSize(value) {
+  return BALL_SIZES[value] ? value : "medium";
+}
 
 // コート種別や拡大率にかかわらずボールを同じ画面サイズにします。
 function getBallRadius() {
   const displayScale = Math.max(0.01, Number(viewport?.scale) || 1);
   const deviceScale = mobileLayoutEnabled && window.innerWidth <= 600 ? 0.78 : 1;
-  return BALL_DISPLAY_RADIUS * deviceScale / displayScale;
+  return BALL_SIZES[normalizeBallSize(state?.ballSize)] * deviceScale / displayScale;
 }
 // コーンの描画幅を定義します。
 const CONE_WIDTH = 34;
@@ -96,6 +105,9 @@ const MAX_SPEED = 2;
 const TEXT_FONT_SIZE = 34;
 // 自動保存に使うキーを定義します。
 const AUTOSAVE_KEY = "basketball-tactics-autosave-v1";
+// 容量の大きい取込動画を端末内へ保存するIndexedDB名です。
+const MEDIA_DATABASE_NAME = "basketball-tactics-media-v1";
+const MEDIA_STORE_NAME = "assets";
 // 作戦ライブラリに使うキーを定義します。
 const LIBRARY_KEY = "basketball-tactics-library-v1";
 // モバイル表示の選択を端末ごとに保持するキーです。
@@ -243,6 +255,9 @@ const canvasShell = document.getElementById("canvasShell");
 const playNameInput = document.getElementById("playName");
 // STEPメモ入力欄を取得します。
 const stepNoteInput = document.getElementById("stepNote");
+// 画像・動画のファイル選択欄を取得します。
+const imageImportInput = document.getElementById("imageImportInput");
+const videoImportInput = document.getElementById("videoImportInput");
 // STEP一覧を取得します。
 const stepList = document.getElementById("stepList");
 // ツール状態表示を取得します。
@@ -294,6 +309,16 @@ const focusStepsVisibilityButton = document.getElementById("focusStepsVisibility
 const focusEditorPanel = document.getElementById("focusEditorPanel");
 // 最大表示中の編集パネル開閉ボタンを取得します。
 const focusEditorToggleButton = document.getElementById("focusEditorToggleButton");
+// 最大表示中の再生設定パネルと開閉ボタンを取得します。
+const focusPlaybackSettingsPanel = document.getElementById("focusPlaybackSettingsPanel");
+const focusPlaybackSettingsButton = document.getElementById("focusPlaybackSettingsButton");
+const focusMovementSpeedRange = document.getElementById("focusMovementSpeedRange");
+const focusMovementSpeedValue = document.getElementById("focusMovementSpeedValue");
+const focusPlaybackSpeedRange = document.getElementById("focusPlaybackSpeedRange");
+const focusPlaybackSpeedValue = document.getElementById("focusPlaybackSpeedValue");
+const focusShowMovementLinesToggle = document.getElementById("focusShowMovementLinesToggle");
+const focusActionOrderList = document.getElementById("focusActionOrderList");
+const focusResetActionOrderButton = document.getElementById("focusResetActionOrderButton");
 // 最大表示中の元に戻すボタンを取得します。
 const focusUndoButton = document.getElementById("focusUndoButton");
 // 最大表示中のやり直しボタンを取得します。
@@ -385,7 +410,7 @@ const TOOL_LABELS = {
   screenStraight: "スクリーン・直線",
   free: "自由線",
   text: "テキスト配置",
-  erase: "線・テキストを削除"
+  erase: "線・素材を削除"
 };
 
 // アプリ全体の状態を定義します。
@@ -410,12 +435,22 @@ let playbackRunId = 0;
 let activeVideoRecorder = null;
 // Toastを消すタイマーを保持します。
 let toastTimer = null;
+// 自動保存容量の警告を繰り返さないよう保持します。
+let autosaveWarningShown = false;
 // Canvasの表示変換情報を保持します。
 let viewport = { scale: 1, offsetX: 0, offsetY: 0, cssWidth: 1, cssHeight: 1 };
 // コートだけを最大表示しているかを保持します。
 let isFocusMode = false;
 // 最大表示中の編集パネルを開いているか保持します。
 let isFocusEditorOpen = false;
+// 最大表示中の再生設定パネルを開いているか保持します。
+let isFocusPlaybackSettingsOpen = false;
+// Canvas上で選択中のテキスト・画像・動画を保持します。
+let selectedCanvasItem = null;
+// 読み込み済み画像・動画要素を再利用します。
+const mediaElementCache = new Map();
+// 再生中の取込動画を描画するフレームIDを保持します。
+let mediaRenderFrame = null;
 // 全番号選択欄を開いているか保持します。
 let playerNumberDetailsVisible = false;
 // コマ送り再生の現在位置を保持します。
@@ -425,6 +460,175 @@ let framePlayback = null;
 function makeId(prefix) {
   // 現在時刻と乱数を組み合わせて返します。
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+// 取込動画を保存する端末内データベースを開きます。
+function openMediaDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("この端末は動画の端末内保存に対応していません"));
+      return;
+    }
+    const request = window.indexedDB.open(MEDIA_DATABASE_NAME, 1);
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(MEDIA_STORE_NAME)) {
+        database.createObjectStore(MEDIA_STORE_NAME);
+      }
+    });
+    request.addEventListener("success", () => resolve(request.result), { once: true });
+    request.addEventListener("error", () => reject(request.error ?? new Error("素材保存領域を開けませんでした")), { once: true });
+  });
+}
+
+// 動画Blobを端末内データベースへ保存します。
+async function saveMediaBlob(assetId, blob) {
+  const database = await openMediaDatabase();
+  try {
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(MEDIA_STORE_NAME, "readwrite");
+      transaction.objectStore(MEDIA_STORE_NAME).put(blob, assetId);
+      transaction.addEventListener("complete", resolve, { once: true });
+      transaction.addEventListener("error", () => reject(transaction.error ?? new Error("動画を保存できませんでした")), { once: true });
+    });
+  } finally {
+    database.close();
+  }
+}
+
+// 端末内データベースから動画Blobを読み込みます。
+async function loadMediaBlob(assetId) {
+  const database = await openMediaDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const request = database.transaction(MEDIA_STORE_NAME, "readonly").objectStore(MEDIA_STORE_NAME).get(assetId);
+      request.addEventListener("success", () => resolve(request.result ?? null), { once: true });
+      request.addEventListener("error", () => reject(request.error ?? new Error("動画を読み込めませんでした")), { once: true });
+    });
+  } finally {
+    database.close();
+  }
+}
+
+// Fileを一時URLで読み込み、画像または動画の縦横寸法を取得します。
+function readMediaDimensions(file, type) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const element = type === "video" ? document.createElement("video") : new Image();
+    const cleanup = () => URL.revokeObjectURL(url);
+    const loadedEvent = type === "video" ? "loadedmetadata" : "load";
+    element.addEventListener(loadedEvent, () => {
+      const width = type === "video" ? element.videoWidth : element.naturalWidth;
+      const height = type === "video" ? element.videoHeight : element.naturalHeight;
+      cleanup();
+      resolve({ width: width || 16, height: height || 9 });
+    }, { once: true });
+    element.addEventListener("error", () => {
+      cleanup();
+      reject(new Error(`${type === "video" ? "動画" : "画像"}を読み込めませんでした`));
+    }, { once: true });
+    if (type === "video") {
+      element.preload = "metadata";
+      element.muted = true;
+      element.playsInline = true;
+    }
+    element.src = url;
+  });
+}
+
+// 画像を自動保存しやすい解像度へ縮小してData URLにします。
+async function prepareImageData(file) {
+  const dimensions = await readMediaDimensions(file, "image");
+  const maximumSide = 1400;
+  const scale = Math.min(1, maximumSide / Math.max(dimensions.width, dimensions.height));
+  const width = Math.max(1, Math.round(dimensions.width * scale));
+  const height = Math.max(1, Math.round(dimensions.height * scale));
+  const image = new Image();
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    await new Promise((resolve, reject) => {
+      image.addEventListener("load", resolve, { once: true });
+      image.addEventListener("error", () => reject(new Error("画像を読み込めませんでした")), { once: true });
+      image.src = sourceUrl;
+    });
+    const buffer = document.createElement("canvas");
+    buffer.width = width;
+    buffer.height = height;
+    const bufferContext = buffer.getContext("2d");
+    bufferContext.drawImage(image, 0, 0, width, height);
+    const keepsTransparency = file.type === "image/png" || file.type === "image/webp";
+    return {
+      src: buffer.toDataURL(keepsTransparency ? file.type : "image/jpeg", keepsTransparency ? undefined : 0.86),
+      width,
+      height
+    };
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+// 取込素材がコート内で見やすく収まる初期サイズを返します。
+function getImportedMediaSize(width, height) {
+  const court = getCourtSize();
+  const maximumWidth = court.width * 0.42;
+  const maximumHeight = court.height * 0.36;
+  const scale = Math.min(1, maximumWidth / Math.max(1, width), maximumHeight / Math.max(1, height));
+  return {
+    width: Math.max(80, width * scale),
+    height: Math.max(60, height * scale)
+  };
+}
+
+// 選択された画像または動画を現在STEPへ追加します。
+async function importMediaFile(event, type) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) {
+    return;
+  }
+  try {
+    if (type === "video" && file.size > 200 * 1024 * 1024) {
+      throw new Error("動画は200MB以下にしてください");
+    }
+    const court = getCourtSize();
+    let source = "";
+    let assetId = "";
+    let dimensions;
+    if (type === "image") {
+      const prepared = await prepareImageData(file);
+      source = prepared.src;
+      dimensions = prepared;
+    } else {
+      dimensions = await readMediaDimensions(file, "video");
+      assetId = makeId("media-asset");
+      await saveMediaBlob(assetId, file);
+    }
+    const display = getImportedMediaSize(dimensions.width, dimensions.height);
+    const mediaItem = {
+      id: makeId("media"),
+      type,
+      name: file.name,
+      mimeType: file.type,
+      src: source,
+      assetId,
+      x: court.width / 2,
+      y: court.height / 2,
+      width: display.width,
+      height: display.height,
+      rotation: 0
+    };
+    commitMutation(() => {
+      getActiveStep().media.push(mediaItem);
+    });
+    selectedCanvasItem = { type: "media", id: mediaItem.id };
+    setTool("select");
+    render();
+    showToast(type === "video" ? "動画を追加しました。ダブルクリックで再生・停止できます" : "画像を追加しました");
+  } catch (error) {
+    console.error("素材を追加できませんでした。", error);
+    window.alert(`素材を追加できませんでした。\n\n${error.message}`);
+  }
 }
 
 // 初期状態を作ります。
@@ -438,7 +642,8 @@ function createInitialState() {
     courtMode: "half",
     activeTool: "select",
     activeLineColor: "black",
-    playerSize: "large",
+    playerSize: "medium",
+    ballSize: "medium",
     movementSpeed: 1,
     playbackSpeed: 1,
     showMovementLines: true,
@@ -469,7 +674,8 @@ function createDefaultStep(number, size) {
     ball: { id: "ball", x: width * 0.54, y: height * 0.78 },
     cones: [],
     lines: [],
-    texts: []
+    texts: [],
+    media: []
   };
 }
 
@@ -514,6 +720,8 @@ function createSnapshot() {
     activeLineColor: state.activeLineColor,
     // 選手マーカーの表示サイズを保存します。
     playerSize: state.playerSize,
+    // ボールの表示サイズを保存します。
+    ballSize: state.ballSize,
     // 選手とボールの移動速度を保存します。
     movementSpeed: state.movementSpeed,
     // 連続再生のテンポを保存します。
@@ -628,6 +836,18 @@ function migrateSnapshot(snapshot) {
       textItem.color = LINE_COLORS[textItem.color] ? textItem.color : "black";
       // 有効な文字サイズでなければ標準サイズを設定します。
       textItem.fontSize = Number.isFinite(Number(textItem.fontSize)) ? Number(textItem.fontSize) : TEXT_FONT_SIZE;
+      // 拡大率と回転角を補います。
+      textItem.scale = Math.max(0.25, Math.min(5, Number(textItem.scale) || 1));
+      textItem.rotation = Number(textItem.rotation) || 0;
+    });
+    // 画像・動画配列がなければ空配列を設定します。
+    step.media = Array.isArray(step.media) ? step.media : [];
+    // 保存済み素材の不足項目を補います。
+    step.media.forEach((mediaItem) => {
+      mediaItem.type = mediaItem.type === "video" ? "video" : "image";
+      mediaItem.width = Math.max(40, Number(mediaItem.width) || 260);
+      mediaItem.height = Math.max(40, Number(mediaItem.height) || 160);
+      mediaItem.rotation = Number(mediaItem.rotation) || 0;
     });
     // 旧版の線へ黒色を補います。
     step.lines.forEach((line) => {
@@ -649,8 +869,10 @@ function migrateSnapshot(snapshot) {
   });
   // 選択中の線色を補正します。
   migrated.activeLineColor = LINE_COLORS[migrated.activeLineColor] ? migrated.activeLineColor : "black";
-  // 選手マーカーサイズを補正し、旧版は従来サイズの大へ設定します。
+  // 選手マーカーサイズを補正し、未設定データは標準の中へ設定します。
   migrated.playerSize = normalizePlayerSize(migrated.playerSize);
+  // ボールサイズを補正し、未設定データは新しい標準の中へ設定します。
+  migrated.ballSize = normalizeBallSize(migrated.ballSize);
   // 移動速度を補正します。
   migrated.movementSpeed = normalizeSpeed(migrated.movementSpeed);
   // 連続再生速度を補正します。
@@ -670,6 +892,8 @@ function migrateSnapshot(snapshot) {
 
 // 履歴スナップショットを状態へ適用します。
 function applySnapshot(snapshot) {
+  // 読込・履歴操作時は素材選択枠を解除します。
+  selectedCanvasItem = null;
   // 最大表示中のSTEP一覧の一時的な表示切替は履歴や保存データとは分離します。
   const focusStepsVisible = isFocusMode ? state.focusShowSteps : false;
   // 旧版データを含めて現行形式へ変換します。
@@ -688,6 +912,8 @@ function applySnapshot(snapshot) {
   state.activeLineColor = migrated.activeLineColor ?? "black";
   // 選手マーカーの表示サイズを復元します。
   state.playerSize = normalizePlayerSize(migrated.playerSize);
+  // ボールの表示サイズを復元します。
+  state.ballSize = normalizeBallSize(migrated.ballSize);
   // 移動速度を復元します。
   state.movementSpeed = normalizeSpeed(migrated.movementSpeed);
   // 連続再生速度を復元します。
@@ -706,6 +932,8 @@ function applySnapshot(snapshot) {
     step.lines = Array.isArray(step.lines) ? step.lines : [];
     // テキスト配列がなければ空配列を設定します。
     step.texts = Array.isArray(step.texts) ? step.texts : [];
+    // 画像・動画配列がなければ空配列を設定します。
+    step.media = Array.isArray(step.media) ? step.media : [];
   });
   // 選択中STEPを復元します。
   state.activeStepId = migrated.activeStepId ?? state.steps[0]?.id;
@@ -887,6 +1115,8 @@ function render() {
   const step = getActiveStep();
   // STEPがある場合だけ中身を描きます。
   if (step) {
+    // 取込画像・動画を戦術線より後ろへ描きます。
+    step.media.forEach((mediaItem) => drawMediaItem(context, mediaItem));
     // 保存済み戦術線を描きます。
     step.lines.forEach((line) => {
       // 移動線が非表示設定の場合は描画だけを省略します。
@@ -931,6 +1161,8 @@ function render() {
     drawBall(context, getPlaybackBall(step.ball, step.id));
     // コート上へ配置したテキストを最前面に描きます。
     step.texts.forEach((textItem) => drawCourtText(context, textItem));
+    // 選択中のテキスト・画像・動画へ変形ハンドルを描きます。
+    drawCanvasItemSelection(context);
   }
   // PNG保存にも残るよう、すべての戦術要素より手前へ著作権表記を描きます。
   drawCopyrightWatermark(context);
@@ -1557,22 +1789,22 @@ function estimateTextWidth(value, fontSize) {
 function getTextBounds(textItem) {
   // テキストの文字サイズを取得します。
   const fontSize = Number(textItem.fontSize ?? TEXT_FONT_SIZE);
+  // テキストの拡大率を取得します。
+  const scale = Math.max(0.25, Math.min(5, Number(textItem.scale) || 1));
   // 左右の余白を含む幅を計算します。
-  const width = Math.max(fontSize, estimateTextWidth(textItem.text, fontSize)) + 18;
+  const width = (Math.max(fontSize, estimateTextWidth(textItem.text, fontSize)) + 18) * scale;
   // 上下の余白を含む高さを計算します。
-  const height = fontSize * 1.35;
+  const height = fontSize * 1.35 * scale;
   // 中央座標から矩形範囲を返します。
   return { left: textItem.x - width / 2, right: textItem.x + width / 2, top: textItem.y - height / 2, bottom: textItem.y + height / 2, width, height };
 }
 
 // テキスト位置をコート内へ収めます。
 function clampTextPosition(textItem, point) {
-  // 現在のコートサイズを取得します。
-  const size = getCourtSize();
   // テキストの大きさを取得します。
   const bounds = getTextBounds({ ...textItem, x: 0, y: 0 });
-  // テキスト全体がコート内へ収まる位置を返します。
-  return { x: Math.max(bounds.width / 2, Math.min(size.width - bounds.width / 2, point.x)), y: Math.max(bounds.height / 2, Math.min(size.height - bounds.height / 2, point.y)) };
+  // 回転後も含めて外周余白内へ収めます。
+  return clampCanvasItemCenter(point, bounds.width, bounds.height);
 }
 
 // コート上へ自由配置したテキストを描きます。
@@ -1581,6 +1813,13 @@ function drawCourtText(ctx, textItem) {
   ctx.save();
   // 文字サイズを取得します。
   const fontSize = Number(textItem.fontSize ?? TEXT_FONT_SIZE);
+  // テキスト中央へ描画原点を移します。
+  ctx.translate(textItem.x, textItem.y);
+  // 自由回転を適用します。
+  ctx.rotate(Number(textItem.rotation) || 0);
+  // 自由な拡大縮小を適用します。
+  const scale = Math.max(0.25, Math.min(5, Number(textItem.scale) || 1));
+  ctx.scale(scale, scale);
   // 太字の日本語対応フォントを設定します。
   ctx.font = `800 ${fontSize}px "Noto Sans JP", "Yu Gothic", sans-serif`;
   // 文字を中央基準で配置します。
@@ -1594,13 +1833,255 @@ function drawCourtText(ctx, textItem) {
   // 角を滑らかにつなぎます。
   ctx.lineJoin = "round";
   // テキストの白い縁取りを描きます。
-  ctx.strokeText(String(textItem.text ?? ""), textItem.x, textItem.y);
+  ctx.strokeText(String(textItem.text ?? ""), 0, 0);
   // 選択した線色と同じ文字色を設定します。
   ctx.fillStyle = LINE_COLORS[textItem.color] ?? LINE_COLORS.black;
   // テキスト本体を描きます。
-  ctx.fillText(String(textItem.text ?? ""), textItem.x, textItem.y);
+  ctx.fillText(String(textItem.text ?? ""), 0, 0);
   // 描画状態を戻します。
   ctx.restore();
+}
+
+// 回転した矩形内に点があるか確認します。
+function pointInRotatedRect(point, item, width, height, padding = 0) {
+  const angle = -(Number(item.rotation) || 0);
+  const dx = point.x - item.x;
+  const dy = point.y - item.y;
+  const localX = dx * Math.cos(angle) - dy * Math.sin(angle);
+  const localY = dx * Math.sin(angle) + dy * Math.cos(angle);
+  return Math.abs(localX) <= width / 2 + padding && Math.abs(localY) <= height / 2 + padding;
+}
+
+// ローカル座標を素材の回転を反映したコート座標へ変換します。
+function itemLocalToCourt(item, localX, localY) {
+  const angle = Number(item.rotation) || 0;
+  return {
+    x: item.x + localX * Math.cos(angle) - localY * Math.sin(angle),
+    y: item.y + localX * Math.sin(angle) + localY * Math.cos(angle)
+  };
+}
+
+// テキスト・画像・動画の外形寸法を返します。
+function getCanvasItemSize(target, item) {
+  if (target.type === "text") {
+    const bounds = getTextBounds(item);
+    return { width: bounds.width, height: bounds.height };
+  }
+  return {
+    width: Math.max(40, Number(item.width) || 260),
+    height: Math.max(40, Number(item.height) || 160)
+  };
+}
+
+// 選択情報に対応するテキストまたは素材を返します。
+function getSelectedCanvasItem(target = selectedCanvasItem) {
+  const step = getActiveStep();
+  if (!step || !target) {
+    return null;
+  }
+  if (target.type === "text") {
+    return step.texts.find((item) => item.id === target.id) ?? null;
+  }
+  if (target.type === "media") {
+    return step.media.find((item) => item.id === target.id) ?? null;
+  }
+  return null;
+}
+
+// 回転後の素材全体が現在見えているCanvas内へ収まる中心位置を返します。
+function clampCanvasItemCenter(point, width, height) {
+  // 最大表示時に生まれるコート外の余白も素材配置スペースとして使います。
+  const safeScale = Math.max(0.01, Number(viewport.scale) || 1);
+  const bounds = {
+    minX: -viewport.offsetX / safeScale - COURT_OUTER_MARGIN,
+    maxX: (viewport.cssWidth - viewport.offsetX) / safeScale - COURT_OUTER_MARGIN,
+    minY: -viewport.offsetY / safeScale - COURT_OUTER_MARGIN,
+    maxY: (viewport.cssHeight - viewport.offsetY) / safeScale - COURT_OUTER_MARGIN
+  };
+  const radius = Math.hypot(width, height) / 2;
+  const maximumRadius = Math.min((bounds.maxX - bounds.minX) / 2, (bounds.maxY - bounds.minY) / 2);
+  const margin = Math.min(radius, maximumRadius);
+  return {
+    x: Math.max(bounds.minX + margin, Math.min(bounds.maxX - margin, point.x)),
+    y: Math.max(bounds.minY + margin, Math.min(bounds.maxY - margin, point.y))
+  };
+}
+
+// 画像・動画要素を非同期で準備し、再描画用キャッシュへ保存します。
+function ensureMediaElement(mediaItem) {
+  const cacheKey = mediaItem.assetId || mediaItem.src || mediaItem.id;
+  if (mediaElementCache.has(cacheKey)) {
+    return mediaElementCache.get(cacheKey);
+  }
+  const entry = { element: null, status: "loading", url: "", error: "" };
+  mediaElementCache.set(cacheKey, entry);
+  entry.ready = (async () => {
+    try {
+      if (mediaItem.type === "video") {
+        const blob = await loadMediaBlob(mediaItem.assetId);
+        if (!blob) {
+          throw new Error("動画ファイルはこの端末にありません");
+        }
+        entry.url = URL.createObjectURL(blob);
+        const video = document.createElement("video");
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.preload = "metadata";
+        video.src = entry.url;
+        await new Promise((resolve, reject) => {
+          video.addEventListener("loadeddata", resolve, { once: true });
+          video.addEventListener("error", () => reject(new Error("動画を再生できません")), { once: true });
+          video.load();
+        });
+        entry.element = video;
+      } else {
+        const image = new Image();
+        image.src = mediaItem.src;
+        await new Promise((resolve, reject) => {
+          image.addEventListener("load", resolve, { once: true });
+          image.addEventListener("error", () => reject(new Error("画像を表示できません")), { once: true });
+        });
+        entry.element = image;
+      }
+      entry.status = "ready";
+      render();
+      return entry;
+    } catch (error) {
+      entry.status = "error";
+      entry.error = error.message;
+      render();
+      return entry;
+    }
+  })();
+  return entry;
+}
+
+// 再生中の取込動画をCanvasへ連続反映します。
+function ensureMediaRenderLoop() {
+  if (mediaRenderFrame) {
+    return;
+  }
+  const frame = () => {
+    const hasPlayingVideo = [...mediaElementCache.values()].some((entry) => entry.element?.tagName === "VIDEO" && !entry.element.paused && !entry.element.ended);
+    if (!hasPlayingVideo) {
+      mediaRenderFrame = null;
+      return;
+    }
+    render();
+    mediaRenderFrame = window.requestAnimationFrame(frame);
+  };
+  mediaRenderFrame = window.requestAnimationFrame(frame);
+}
+
+// 取込画像・動画をCanvasへ描画します。
+function drawMediaItem(ctx, mediaItem) {
+  const entry = ensureMediaElement(mediaItem);
+  const width = Math.max(40, Number(mediaItem.width) || 260);
+  const height = Math.max(40, Number(mediaItem.height) || 160);
+  ctx.save();
+  ctx.translate(mediaItem.x, mediaItem.y);
+  ctx.rotate(Number(mediaItem.rotation) || 0);
+  if (entry.status === "ready" && entry.element) {
+    ctx.drawImage(entry.element, -width / 2, -height / 2, width, height);
+    if (mediaItem.type === "video" && entry.element.paused) {
+      ctx.fillStyle = "rgba(17, 24, 39, 0.56)";
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.min(width, height) * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      const icon = Math.min(width, height) * 0.1;
+      ctx.beginPath();
+      ctx.moveTo(-icon * 0.3, -icon * 0.55);
+      ctx.lineTo(icon * 0.65, 0);
+      ctx.lineTo(-icon * 0.3, icon * 0.55);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+    ctx.fillRect(-width / 2, -height / 2, width, height);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-width / 2, -height / 2, width, height);
+    ctx.fillStyle = "#475569";
+    ctx.font = `700 ${Math.max(12, Math.min(22, height * 0.12))}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(entry.status === "error" ? entry.error : "読み込み中…", 0, 0, width - 20);
+  }
+  ctx.restore();
+}
+
+// 選択中素材へ移動・拡大縮小・回転用の枠とハンドルを描きます。
+function drawCanvasItemSelection(ctx) {
+  const item = getSelectedCanvasItem();
+  if (!item || !selectedCanvasItem || state.activeTool !== "select" || playbackTimer) {
+    return;
+  }
+  const size = getCanvasItemSize(selectedCanvasItem, item);
+  const handleRadius = 9 / Math.max(0.01, viewport.scale);
+  ctx.save();
+  ctx.translate(item.x, item.y);
+  ctx.rotate(Number(item.rotation) || 0);
+  ctx.strokeStyle = "#2563eb";
+  ctx.lineWidth = 2 / Math.max(0.01, viewport.scale);
+  ctx.setLineDash([7 / Math.max(0.01, viewport.scale), 5 / Math.max(0.01, viewport.scale)]);
+  ctx.strokeRect(-size.width / 2, -size.height / 2, size.width, size.height);
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(0, -size.height / 2);
+  ctx.lineTo(0, -size.height / 2 - 28 / Math.max(0.01, viewport.scale));
+  ctx.stroke();
+  const resize = { x: size.width / 2, y: size.height / 2 };
+  const rotate = { x: 0, y: -size.height / 2 - 28 / Math.max(0.01, viewport.scale) };
+  ctx.fillStyle = "#ffffff";
+  ctx.strokeStyle = "#2563eb";
+  [resize, rotate].forEach((handle) => {
+    ctx.beginPath();
+    ctx.arc(handle.x, handle.y, handleRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
+// 選択素材の変形ハンドル上にPointerがあるか確認します。
+function findCanvasItemTransformHandle(point) {
+  const item = getSelectedCanvasItem();
+  if (!item || !selectedCanvasItem) {
+    return null;
+  }
+  const size = getCanvasItemSize(selectedCanvasItem, item);
+  const hitRadius = 18 / Math.max(0.01, viewport.scale);
+  const resizePoint = itemLocalToCourt(item, size.width / 2, size.height / 2);
+  const rotatePoint = itemLocalToCourt(item, 0, -size.height / 2 - 28 / Math.max(0.01, viewport.scale));
+  if (distance(point, rotatePoint) <= hitRadius) {
+    return "rotate";
+  }
+  if (distance(point, resizePoint) <= hitRadius) {
+    return "resize";
+  }
+  return null;
+}
+
+// 取込動画の再生・停止を切り替えます。
+async function toggleImportedVideo(mediaItem) {
+  const entry = ensureMediaElement(mediaItem);
+  await entry.ready;
+  if (entry.status !== "ready" || !entry.element) {
+    showToast(entry.error || "動画を読み込めません");
+    return;
+  }
+  if (entry.element.paused) {
+    await entry.element.play();
+    ensureMediaRenderLoop();
+    showToast("動画を再生します");
+  } else {
+    entry.element.pause();
+    render();
+    showToast("動画を停止しました");
+  }
 }
 
 // 戦術線を種類別に描きます。
@@ -1962,6 +2443,11 @@ function findDraggableAt(point) {
     // コーン対象情報を返します。
     return { type: "cone", id: cone.id };
   }
+  // 取込画像・動画上の場合は素材を返します。
+  const mediaItem = findMediaAt(point);
+  if (mediaItem) {
+    return { type: "media", id: mediaItem.id };
+  }
   // 対象がなければnullを返します。
   return null;
 }
@@ -1977,11 +2463,25 @@ function findTextAt(point) {
   }
   // 最後に追加したテキストから逆順で確認します。
   return [...(step.texts ?? [])].reverse().find((textItem) => {
-    // テキストの当たり判定範囲を取得します。
+    // 回転後のテキスト矩形内かを返します。
     const bounds = getTextBounds(textItem);
-    // 指定点が範囲内かを返します。
-    return point.x >= bounds.left && point.x <= bounds.right && point.y >= bounds.top && point.y <= bounds.bottom;
+    return pointInRotatedRect(point, textItem, bounds.width, bounds.height, 6);
   }) ?? null;
+}
+
+// 指定位置にある取込画像・動画を探します。
+function findMediaAt(point) {
+  const step = getActiveStep();
+  if (!step) {
+    return null;
+  }
+  return [...(step.media ?? [])].reverse().find((mediaItem) => pointInRotatedRect(
+    point,
+    mediaItem,
+    Math.max(40, Number(mediaItem.width) || 260),
+    Math.max(40, Number(mediaItem.height) || 160),
+    6
+  )) ?? null;
 }
 
 // 指定位置に近い戦術線を探します。
@@ -2180,10 +2680,17 @@ function handlePointerDown(event) {
   const rawPoint = clampPoint(pointerToCourt(event));
   // 選択ツールの場合を処理します。
   if (state.activeTool === "select") {
-    // 位置にある対象を探します。
-    const target = findDraggableAt(rawPoint);
+    // 選択中素材の変形ハンドルを優先して確認します。
+    const transform = findCanvasItemTransformHandle(rawPoint);
+    // 変形ハンドルでなければ位置にある対象を探します。
+    const target = transform ? { ...selectedCanvasItem } : findDraggableAt(rawPoint);
     // 対象がある場合だけドラッグを開始します。
     if (target) {
+      // テキスト・画像・動画は選択枠を表示します。
+      selectedCanvasItem = target.type === "text" || target.type === "media" ? { ...target } : null;
+      // 現在の素材データを取得します。
+      const canvasItem = getSelectedCanvasItem(target);
+      const itemSize = canvasItem ? getCanvasItemSize(target, canvasItem) : null;
       // ドラッグ前の状態を保存します。
       dragSession = {
         // 操作中Pointer IDを保存します。
@@ -2192,10 +2699,29 @@ function handlePointerDown(event) {
         target,
         // 変更前スナップショットを保存します。
         before: createSnapshot(),
+        // 移動・拡大縮小・回転の種別を保存します。
+        transform: transform || "move",
+        // 変形開始時の素材状態を保存します。
+        initial: canvasItem ? {
+          x: canvasItem.x,
+          y: canvasItem.y,
+          width: itemSize.width,
+          height: itemSize.height,
+          scale: Number(canvasItem.scale) || 1,
+          rotation: Number(canvasItem.rotation) || 0,
+          pointerAngle: Math.atan2(rawPoint.y - canvasItem.y, rawPoint.x - canvasItem.x),
+          pointerDistance: Math.max(1, distance(rawPoint, canvasItem))
+        } : null,
+        // 中心以外をつかんだ場合のPointer差分を保存します。
+        offset: canvasItem ? { x: rawPoint.x - canvasItem.x, y: rawPoint.y - canvasItem.y } : { x: 0, y: 0 },
         // 移動有無を初期化します。
         moved: false
       };
       // 選手を押した直後から選択色が見えるよう再描画します。
+      render();
+    } else {
+      // 空白を押した場合は素材選択を解除します。
+      selectedCanvasItem = null;
       render();
     }
     // 選択ツール処理を終了します。
@@ -2217,6 +2743,18 @@ function handlePointerDown(event) {
       // 削除結果を通知します。
       showToast("テキストを削除しました");
       // 消去ツール処理を終了します。
+      return;
+    }
+    // 位置にある画像・動画を探します。
+    const mediaItem = findMediaAt(rawPoint);
+    // 画像・動画がある場合は優先して削除します。
+    if (mediaItem) {
+      commitMutation(() => {
+        const step = getActiveStep();
+        step.media = step.media.filter((item) => item.id !== mediaItem.id);
+      });
+      selectedCanvasItem = null;
+      showToast(mediaItem.type === "video" ? "動画を削除しました" : "画像を削除しました");
       return;
     }
     // 位置にあるコーンを探します。
@@ -2259,7 +2797,7 @@ function handlePointerDown(event) {
     // キャンセルまたは空文字の場合は追加しません。
     if (enteredText !== null && enteredText.trim()) {
       // 新しいテキストデータを仮作成します。
-      const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, fontSize: TEXT_FONT_SIZE };
+      const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, fontSize: TEXT_FONT_SIZE, scale: 1, rotation: 0 };
       // テキスト全体がコート内へ収まる位置を計算します。
       const position = clampTextPosition(textItem, rawPoint);
       // 履歴付きでテキストを追加します。
@@ -2271,6 +2809,9 @@ function handlePointerDown(event) {
         // 現在STEPへ追加します。
         getActiveStep().texts.push(textItem);
       });
+      // 追加したテキストを選択してすぐ変形できるようにします。
+      selectedCanvasItem = { type: "text", id: textItem.id };
+      setTool("select");
       // 追加結果を通知します。
       showToast("テキストを追加しました");
     }
@@ -2330,6 +2871,14 @@ function handleCanvasDoubleClick(event) {
   }
   // コート座標を取得します。
   const point = clampPoint(pointerToCourt(event));
+  // 動画上のダブルクリックは再生・停止を切り替えます。
+  const mediaItem = findMediaAt(point);
+  if (mediaItem?.type === "video") {
+    selectedCanvasItem = { type: "media", id: mediaItem.id };
+    toggleImportedVideo(mediaItem);
+    render();
+    return;
+  }
   // 指定位置のテキストを探します。
   const textItem = findTextAt(point);
   // テキストがない場合は終了します。
@@ -2393,12 +2942,37 @@ function handlePointerMove(event) {
       const textItem = step.texts.find((item) => item.id === dragSession.target.id);
       // テキストが見つかった場合は位置を更新します。
       if (textItem) {
-        // テキスト全体をコート内へ収めます。
-        const next = clampTextPosition(textItem, point);
-        // X位置を更新します。
-        textItem.x = next.x;
-        // Y位置を更新します。
-        textItem.y = next.y;
+        if (dragSession.transform === "resize") {
+          const ratio = Math.max(0.25, Math.min(5, distance(point, textItem) / dragSession.initial.pointerDistance));
+          textItem.scale = Math.max(0.25, Math.min(5, dragSession.initial.scale * ratio));
+        } else if (dragSession.transform === "rotate") {
+          const currentAngle = Math.atan2(point.y - textItem.y, point.x - textItem.x);
+          textItem.rotation = dragSession.initial.rotation + currentAngle - dragSession.initial.pointerAngle;
+        } else {
+          const desired = { x: point.x - dragSession.offset.x, y: point.y - dragSession.offset.y };
+          const next = clampTextPosition(textItem, desired);
+          textItem.x = next.x;
+          textItem.y = next.y;
+        }
+      }
+    }
+    // 対象が画像・動画の場合を処理します。
+    if (dragSession.target.type === "media") {
+      const mediaItem = step.media.find((item) => item.id === dragSession.target.id);
+      if (mediaItem) {
+        if (dragSession.transform === "resize") {
+          const ratio = Math.max(0.2, Math.min(5, distance(point, mediaItem) / dragSession.initial.pointerDistance));
+          mediaItem.width = Math.max(40, dragSession.initial.width * ratio);
+          mediaItem.height = Math.max(40, dragSession.initial.height * ratio);
+        } else if (dragSession.transform === "rotate") {
+          const currentAngle = Math.atan2(point.y - mediaItem.y, point.x - mediaItem.x);
+          mediaItem.rotation = dragSession.initial.rotation + currentAngle - dragSession.initial.pointerAngle;
+        } else {
+          const desired = { x: point.x - dragSession.offset.x, y: point.y - dragSession.offset.y };
+          const next = clampCanvasItemCenter(desired, mediaItem.width, mediaItem.height);
+          mediaItem.x = next.x;
+          mediaItem.y = next.y;
+        }
       }
     }
     // 対象がコーンの場合を処理します。
@@ -2595,6 +3169,17 @@ function setPlayerSize(sizeName) {
   autosave();
 }
 
+// ボールの表示サイズを切り替えます。
+function setBallSize(sizeName) {
+  const safeSize = normalizeBallSize(sizeName);
+  state.ballSize = safeSize;
+  document.querySelectorAll("[data-ball-size]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.ballSize === safeSize);
+  });
+  render();
+  autosave();
+}
+
 // 再生ボタンの表示文字を一括更新します。
 function updatePlayButtonLabels(label) {
   // 通常表示と最大表示を同じ短いアイコンへ更新します。
@@ -2662,12 +3247,40 @@ function setFocusEditorOpen(open) {
   focusEditorToggleButton.title = isFocusEditorOpen ? "編集ツールを隠す" : "編集ツールを表示";
 }
 
+// 最大表示中の再生設定パネルを開閉します。
+function setFocusPlaybackSettingsOpen(open) {
+  isFocusPlaybackSettingsOpen = Boolean(open);
+  focusPlaybackSettingsPanel?.classList.toggle("open", isFocusPlaybackSettingsOpen);
+  focusPlaybackSettingsButton?.classList.toggle("active", isFocusPlaybackSettingsOpen);
+  focusPlaybackSettingsButton?.setAttribute("aria-pressed", String(isFocusPlaybackSettingsOpen));
+  const hint = isFocusPlaybackSettingsOpen ? "再生設定を隠す" : "再生設定を表示";
+  focusPlaybackSettingsButton?.setAttribute("aria-label", hint);
+  if (focusPlaybackSettingsButton) {
+    focusPlaybackSettingsButton.title = hint;
+  }
+}
+
+// 最大表示中の再生設定値を通常設定と同期します。
+function syncFocusPlaybackSettings() {
+  if (!focusPlaybackSettingsPanel) {
+    return;
+  }
+  focusMovementSpeedRange.value = String(normalizeSpeed(state.movementSpeed));
+  focusMovementSpeedValue.textContent = `${normalizeSpeed(state.movementSpeed).toFixed(2)}×`;
+  focusPlaybackSpeedRange.value = String(normalizeSpeed(state.playbackSpeed));
+  focusPlaybackSpeedValue.textContent = `${normalizeSpeed(state.playbackSpeed).toFixed(2)}×`;
+  focusShowMovementLinesToggle.checked = state.showMovementLines;
+  setFocusPlaybackSettingsOpen(isFocusPlaybackSettingsOpen);
+}
+
 // コートだけの最大表示を切り替えます。
 function setFocusMode(enabled) {
   // 最大表示状態を保存します。
   isFocusMode = Boolean(enabled);
   // 最大表示へ入る時も戻る時も編集パネルを一度閉じます。
   setFocusEditorOpen(false);
+  // 再生設定も最大表示へ入るたび標準の非表示へ戻します。
+  setFocusPlaybackSettingsOpen(false);
   // 画面全体へ最大表示クラスを切り替えます。
   document.body.classList.toggle("board-focus", isFocusMode);
   // 最大表示へ入る場合を処理します。
@@ -2692,6 +3305,10 @@ function setTool(tool) {
   clearPlaybackPreview();
   // 選択ツールを状態へ保存します。
   state.activeTool = tool;
+  // 選択ツール以外へ切り替えた場合は素材選択枠を解除します。
+  if (tool !== "select") {
+    selectedCanvasItem = null;
+  }
   // 全ツールボタンを確認します。
   document.querySelectorAll("[data-tool]").forEach((button) => {
     // 選択ツールと一致するボタンだけactiveにします。
@@ -2769,6 +3386,13 @@ function changeCourtMode(mode) {
         textItem.y *= scaleY;
         // 文字サイズを小さい倍率へ合わせます。
         textItem.fontSize *= Math.min(scaleX, scaleY);
+      });
+      // 取込画像・動画の位置と大きさを新しいコート寸法へ合わせます。
+      step.media.forEach((mediaItem) => {
+        mediaItem.x *= scaleX;
+        mediaItem.y *= scaleY;
+        mediaItem.width *= scaleX;
+        mediaItem.height *= scaleY;
       });
     });
   });
@@ -2991,6 +3615,8 @@ function renderActionOrderList() {
     empty.textContent = "動作なし";
     // 一覧へ追加します。
     actionOrderList.appendChild(empty);
+    // 最大表示側も空表示へ同期します。
+    renderFocusActionOrderList([]);
     // 処理を終了します。
     return;
   }
@@ -3079,6 +3705,66 @@ function renderActionOrderList() {
     // 一覧へ行を追加します。
     actionOrderList.appendChild(row);
   });
+  // 最大表示側へ同じ動作順を描画します。
+  renderFocusActionOrderList(actions);
+}
+
+// 最大表示中の動作順一覧をコンパクトに描画します。
+function renderFocusActionOrderList(actions) {
+  if (!focusActionOrderList) {
+    return;
+  }
+  focusActionOrderList.innerHTML = "";
+  if (focusResetActionOrderButton) {
+    focusResetActionOrderButton.disabled = actions.length === 0;
+  }
+  if (actions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "action-order-empty";
+    empty.textContent = "動作なし";
+    focusActionOrderList.appendChild(empty);
+    return;
+  }
+  const step = getActiveStep();
+  const maximumOrder = Math.max(9, actions.length + 2);
+  actions.forEach(({ line }, actionIndex) => {
+    const row = document.createElement("div");
+    row.className = "action-order-row";
+    const player = line.playerId ? step.players.find((item) => item.id === line.playerId) : null;
+    const sideLabel = player ? (player.side === "offense" ? "O" : "D") : "";
+    const targetLabel = line.type === "pass" ? "ボール" : player ? `${sideLabel}${player.label}` : "線";
+    const label = document.createElement("span");
+    label.className = "action-order-focus-label";
+    label.textContent = `${actionIndex + 1}. ${getActionTypeLabel(line.type)}・${targetLabel}`;
+    const select = document.createElement("select");
+    select.className = "action-order-select";
+    select.setAttribute("aria-label", `${label.textContent}の再生順`);
+    for (let order = 1; order <= maximumOrder; order += 1) {
+      const option = document.createElement("option");
+      option.value = String(order);
+      option.textContent = String(order);
+      select.appendChild(option);
+    }
+    select.value = String(normalizePlayOrder(line.playOrder, 1));
+    select.addEventListener("change", () => {
+      const nextOrder = normalizePlayOrder(select.value, 1);
+      commitMutation(() => {
+        const target = getActiveStep().lines.find((item) => item.id === line.id);
+        if (target) {
+          target.playOrder = nextOrder;
+        }
+      });
+    });
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "action-order-delete";
+    deleteButton.textContent = "×";
+    deleteButton.setAttribute("aria-label", `${label.textContent}を削除`);
+    deleteButton.title = `${label.textContent}を削除`;
+    deleteButton.addEventListener("click", () => deleteActionLine(line.id));
+    row.append(label, select, deleteButton);
+    focusActionOrderList.appendChild(row);
+  });
 }
 
 // 動作順欄から指定した動作線だけを削除します。
@@ -3143,6 +3829,8 @@ function selectStep(stepId) {
   playbackVisual = null;
   // 選択中STEPを更新します。
   state.activeStepId = stepId;
+  // STEP切替時は素材選択枠を解除します。
+  selectedCanvasItem = null;
   // 画面を同期します。
   syncInterface();
 }
@@ -3190,6 +3878,8 @@ function addStep() {
     // 新しいSTEPを選択します。
     state.activeStepId = duplicated.id;
   });
+  // 新しいSTEPでは素材選択を解除します。
+  selectedCanvasItem = null;
   // 結果を通知します。
   showToast(endState.hasAnimation ? "選手・ボールの動作後配置で次STEPを追加しました" : "現在の配置で次STEPを追加しました");
 }
@@ -3210,6 +3900,8 @@ function deleteStep() {
     // 隣接するSTEPを選択します。
     state.activeStepId = state.steps[Math.max(0, activeIndex - 1)].id;
   });
+  // 削除後は素材選択を解除します。
+  selectedCanvasItem = null;
   // 結果を通知します。
   showToast("STEPを削除しました");
 }
@@ -3824,6 +4516,8 @@ function resetBoard() {
   fresh.activeTool = state.activeTool;
   // 状態を置き換えます。
   state = fresh;
+  // 素材選択状態を解除します。
+  selectedCanvasItem = null;
   // 作戦名入力欄を同期します。
   playNameInput.value = state.playName;
   // 画面を同期します。
@@ -4664,8 +5358,17 @@ async function deleteLibraryItem(item) {
 
 // 作業中状態を自動保存します。
 function autosave() {
-  // 現在スナップショットを保存します。
-  localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(createSnapshot()));
+  try {
+    // 現在スナップショットを保存します。
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(createSnapshot()));
+    autosaveWarningShown = false;
+  } catch (error) {
+    console.warn("自動保存容量を超えました。", error);
+    if (!autosaveWarningShown) {
+      autosaveWarningShown = true;
+      showToast("画像が多いため自動保存容量を超えました。JSON保存をご利用ください");
+    }
+  }
 }
 
 // 旧版の未編集初期配置が自動保存されているか確認します。
@@ -4753,6 +5456,8 @@ function syncInterface(save = true) {
   showMovementLinesToggle.checked = state.showMovementLines;
   // 最大表示中の表示切替を薄いアイコンを含めて同期します。
   syncFocusVisibility();
+  // 最大表示中の再生設定を同期します。
+  syncFocusPlaybackSettings();
   // 色ボタンを選択状態へ同期します。
   setLineColor(state.activeLineColor);
   // 移動速度設定を同期します。
@@ -4768,10 +5473,16 @@ function syncInterface(save = true) {
     // 現在サイズと一致するボタンだけactiveにします。
     button.classList.toggle("active", button.dataset.playerSize === normalizePlayerSize(state.playerSize));
   });
+  // ボールサイズボタンを選択状態へ同期します。
+  document.querySelectorAll("[data-ball-size]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.ballSize === normalizeBallSize(state.ballSize));
+  });
   // 現在STEPを取得します。
   const step = getActiveStep();
   // メモ入力欄を同期します。
-  stepNoteInput.value = step?.note ?? "";
+  if (stepNoteInput) {
+    stepNoteInput.value = step?.note ?? "";
+  }
   // STEP削除ボタンを制御します。
   document.getElementById("deleteStepButton").disabled = state.steps.length <= 1;
   // 履歴ボタンを更新します。
@@ -4863,6 +5574,24 @@ document.querySelectorAll("[data-player-size]").forEach((button) => {
   button.addEventListener("click", () => setPlayerSize(button.dataset.playerSize));
 });
 
+// ボールサイズボタンへイベントを登録します。
+document.querySelectorAll("[data-ball-size]").forEach((button) => {
+  button.addEventListener("click", () => setBallSize(button.dataset.ballSize));
+});
+
+// 通常表示・最大表示の素材取込ボタンを共通登録します。
+document.querySelectorAll("[data-import-media]").forEach((button) => {
+  button.addEventListener("click", () => {
+    if (button.dataset.importMedia === "video") {
+      videoImportInput?.click();
+    } else {
+      imageImportInput?.click();
+    }
+  });
+});
+imageImportInput?.addEventListener("change", (event) => importMediaFile(event, "image"));
+videoImportInput?.addEventListener("change", (event) => importMediaFile(event, "video"));
+
 // 簡易人数の増減ボタンへイベントを登録します。
 document.querySelectorAll("[data-player-count-change]").forEach((button) => {
   button.addEventListener("click", () => {
@@ -4887,6 +5616,8 @@ movementSpeedRange.addEventListener("input", () => {
   state.movementSpeed = normalizeSpeed(movementSpeedRange.value);
   // 現在値を表示します。
   movementSpeedValue.textContent = `${state.movementSpeed.toFixed(2)}×`;
+  // 最大表示側も同期します。
+  syncFocusPlaybackSettings();
   // 設定を自動保存します。
   autosave();
 });
@@ -4897,6 +5628,8 @@ playbackSpeedRange.addEventListener("input", () => {
   state.playbackSpeed = normalizeSpeed(playbackSpeedRange.value);
   // 現在値を表示します。
   playbackSpeedValue.textContent = `${state.playbackSpeed.toFixed(2)}×`;
+  // 最大表示側も同期します。
+  syncFocusPlaybackSettings();
   // 設定を自動保存します。
   autosave();
 });
@@ -4943,6 +5676,33 @@ focusStepsVisibilityButton.addEventListener("click", () => {
 });
 // 最大表示中の編集ツール開閉ボタンを登録します。
 focusEditorToggleButton.addEventListener("click", () => setFocusEditorOpen(!isFocusEditorOpen));
+// 最大表示中の再生設定パネル開閉を登録します。
+focusPlaybackSettingsButton?.addEventListener("click", () => setFocusPlaybackSettingsOpen(!isFocusPlaybackSettingsOpen));
+// 最大表示中の移動速度変更を登録します。
+focusMovementSpeedRange?.addEventListener("input", () => {
+  state.movementSpeed = normalizeSpeed(focusMovementSpeedRange.value);
+  movementSpeedRange.value = String(state.movementSpeed);
+  movementSpeedValue.textContent = `${state.movementSpeed.toFixed(2)}×`;
+  syncFocusPlaybackSettings();
+  autosave();
+});
+// 最大表示中の連続再生速度変更を登録します。
+focusPlaybackSpeedRange?.addEventListener("input", () => {
+  state.playbackSpeed = normalizeSpeed(focusPlaybackSpeedRange.value);
+  playbackSpeedRange.value = String(state.playbackSpeed);
+  playbackSpeedValue.textContent = `${state.playbackSpeed.toFixed(2)}×`;
+  syncFocusPlaybackSettings();
+  autosave();
+});
+// 最大表示中の移動線表示切替を登録します。
+focusShowMovementLinesToggle?.addEventListener("change", () => {
+  state.showMovementLines = focusShowMovementLinesToggle.checked;
+  showMovementLinesToggle.checked = state.showMovementLines;
+  render();
+  autosave();
+});
+// 最大表示中の動作順初期化を登録します。
+focusResetActionOrderButton?.addEventListener("click", resetActionOrders);
 // 最大表示中の元に戻すボタンを登録します。
 focusUndoButton.addEventListener("click", undo);
 // 最大表示中のやり直しボタンを登録します。
@@ -5056,6 +5816,8 @@ document.getElementById("closeLibraryButton").addEventListener("click", () => li
 showMovementLinesToggle.addEventListener("change", () => {
   // 設定値を状態へ保存します。
   state.showMovementLines = showMovementLinesToggle.checked;
+  // 最大表示側へ同期します。
+  syncFocusPlaybackSettings();
   // 画面を再描画します。
   render();
   // 設定を自動保存します。
@@ -5072,6 +5834,8 @@ document.addEventListener("fullscreenchange", () => {
     document.body.classList.remove("board-focus");
     // 最大表示用の編集パネルも閉じます。
     setFocusEditorOpen(false);
+    // 最大表示用の再生設定パネルも閉じます。
+    setFocusPlaybackSettingsOpen(false);
     // レイアウト反映後にCanvasを再計算します。
     window.setTimeout(resizeCanvas, 40);
   }
@@ -5086,7 +5850,7 @@ playNameInput.addEventListener("input", () => {
 });
 
 // STEPメモ変更を状態へ反映します。
-stepNoteInput.addEventListener("input", () => {
+stepNoteInput?.addEventListener("input", () => {
   // 現在のSTEPを取得します。
   const step = getActiveStep();
   // STEPがある場合はメモを保存します。
