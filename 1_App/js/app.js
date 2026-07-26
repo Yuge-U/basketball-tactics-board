@@ -151,8 +151,24 @@ const MEDIA_STORE_NAME = "assets";
 const LIBRARY_KEY = "basketball-tactics-library-v1";
 // モバイル表示の選択を端末ごとに保持するキーです。
 const MOBILE_LAYOUT_KEY = "basketball-tactics-mobile-layout-v1";
+// 利用者が編集できる保存フォルダ一覧を端末へ保持します。
+const SAVE_FOLDERS_KEY = "basketball-tactics-save-folders-v1";
+// 初回だけ表示する従来の保存フォルダ一覧です。以後は自由に編集できます。
+const DEFAULT_SAVE_FOLDERS = Object.freeze([
+  "Shared",
+  "U12/Offense",
+  "U12/Defense",
+  "U12/SLOB",
+  "U12/BLOB",
+  "U12/Practice",
+  "U15/Offense",
+  "U15/Defense",
+  "U15/SLOB",
+  "U15/BLOB",
+  "U15/Practice"
+]);
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v40";
+const APP_VERSION = "v41";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -199,6 +215,73 @@ const GUIDE_PAGES = [
     body: "大切な作戦は、設定画面の「一括バックアップ」から定期的に保存してください。\n\nバックアップファイルがあれば、端末変更時やデータトラブル時に作戦をまとめて復元できます。"
   }
 ];
+
+// 保存フォルダ名をOneDriveの階層パスとして扱える形へ整えます。
+function normalizeSaveFolderPath(value) {
+  const raw = String(value || "").replace(/\\/g, "/").trim().replace(/^\/+|\/+$/g, "");
+  if (!raw) return "";
+  return raw.split("/").map((segment) => segment.trim()).join("/");
+}
+
+// 保存フォルダ名が安全に利用できるか確認します。
+function validateSaveFolderPath(value) {
+  const normalized = normalizeSaveFolderPath(value);
+  if (!normalized) return { valid: false, value: "", message: "フォルダ名を入力してください。" };
+  if (normalized.length > 120) return { valid: false, value: normalized, message: "フォルダ名は120文字以内にしてください。" };
+  const segments = normalized.split("/");
+  if (segments.some((segment) => !segment)) {
+    return { valid: false, value: normalized, message: "「/」の前後にフォルダ名を入力してください。" };
+  }
+  if (segments.some((segment) => segment === "." || segment === "..")) {
+    return { valid: false, value: normalized, message: "「.」と「..」はフォルダ名に使用できません。" };
+  }
+  if (segments.some((segment) => /["*:<>?\\|]/.test(segment) || /[.\s]$/.test(segment))) {
+    return { valid: false, value: normalized, message: "フォルダ名に使用できない文字、または末尾のピリオド・空白が含まれています。" };
+  }
+  return { valid: true, value: normalized, message: "" };
+}
+
+// 重複や不正値を除いた保存フォルダ一覧を返します。
+function normalizeSaveFolderList(values) {
+  const folders = [];
+  const seen = new Set();
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    const result = validateSaveFolderPath(value);
+    const key = result.value.toLocaleLowerCase("ja-JP");
+    if (!result.valid || seen.has(key)) return;
+    seen.add(key);
+    folders.push(result.value);
+  });
+  return folders;
+}
+
+// 端末へ保存された一覧と更新日時を読み込み、初回だけ従来一覧を設定します。
+function readSaveFolderRecord() {
+  try {
+    const raw = localStorage.getItem(SAVE_FOLDERS_KEY);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return { folders: normalizeSaveFolderList(parsed), updatedAt: "" };
+      }
+      if (parsed && typeof parsed === "object" && Array.isArray(parsed.folders)) {
+        return {
+          folders: normalizeSaveFolderList(parsed.folders),
+          updatedAt: String(parsed.updatedAt || "")
+        };
+      }
+    }
+  } catch (error) {
+    console.warn("保存フォルダ一覧を読み込めませんでした。", error);
+  }
+  return { folders: [...DEFAULT_SAVE_FOLDERS], updatedAt: "" };
+}
+
+// フォルダ階層を画面上で読みやすい区切りへ変換します。
+function displaySaveFolderPath(folder) {
+  return normalizeSaveFolderPath(folder).split("/").join(" / ");
+}
+
 // 選択可能な線色を定義します。
 const LINE_COLORS = {
   // 黒線の色です。
@@ -358,6 +441,13 @@ const libraryDialog = document.getElementById("libraryDialog");
 // 保存済み作戦一覧を取得します。
 const libraryList = document.getElementById("libraryList");
 const playFolderInput = document.getElementById("playFolder");
+const manageSaveFoldersButton = document.getElementById("manageSaveFoldersButton");
+const saveFolderManagerDialog = document.getElementById("saveFolderManagerDialog");
+const saveFolderManagerList = document.getElementById("saveFolderManagerList");
+const saveFolderManagerStatus = document.getElementById("saveFolderManagerStatus");
+const newSaveFolderInput = document.getElementById("newSaveFolderInput");
+const addSaveFolderButton = document.getElementById("addSaveFolderButton");
+const restoreDefaultSaveFoldersButton = document.getElementById("restoreDefaultSaveFoldersButton");
 const playTagsInput = document.getElementById("playTags");
 const playFavoriteInput = document.getElementById("playFavorite");
 const playFavoriteLabel = document.querySelector(".play-favorite-toggle");
@@ -407,6 +497,11 @@ let termsRequired = false;
 let guidePageIndex = 0;
 let bulkTransferInProgress = false;
 let lastLibraryItems = [];
+const initialSaveFolderRecord = readSaveFolderRecord();
+let saveFolders = initialSaveFolderRecord.folders;
+let saveFoldersUpdatedAt = initialSaveFolderRecord.updatedAt;
+let folderSettingsSyncPromise = null;
+let autosaveStateRestored = false;
 // JSON読込用のファイル選択欄を取得します。
 const importJsonInput = document.getElementById("importJsonInput");
 // 連続再生を動画へ保存するボタンを取得します。
@@ -481,6 +576,250 @@ function syncFavoriteHint() {
   const hint = playFavoriteInput.checked ? "お気に入りから外す" : "お気に入りに追加";
   playFavoriteInput.setAttribute("aria-label", hint);
   playFavoriteLabel.title = hint;
+}
+
+// 新しい作戦へ使う現在の先頭保存フォルダを返します。
+function getPreferredSaveFolder() {
+  return saveFolders[0] || "";
+}
+
+// フォルダ管理画面へ同期状況や入力エラーを表示します。
+function setSaveFolderManagerStatus(message, isError = false) {
+  if (!saveFolderManagerStatus) return;
+  saveFolderManagerStatus.textContent = String(message || "");
+  saveFolderManagerStatus.classList.toggle("error-text", Boolean(isError));
+}
+
+// 保存フォルダ一覧を端末へ書き込みます。
+function writeSaveFolderRecord() {
+  try {
+    localStorage.setItem(SAVE_FOLDERS_KEY, JSON.stringify({
+      version: 1,
+      updatedAt: saveFoldersUpdatedAt,
+      folders: saveFolders
+    }));
+  } catch (error) {
+    console.warn("保存フォルダ一覧を端末へ保存できませんでした。", error);
+  }
+}
+
+// 現在の保存先または読込作戦の保存先を含めて選択欄を描画します。
+function renderSaveFolderOptions(preferredFolder = state?.libraryMeta?.folder || "") {
+  if (!playFolderInput) return;
+  const selectedFolder = normalizeSaveFolderPath(preferredFolder);
+  playFolderInput.innerHTML = "";
+  saveFolders.forEach((folder) => {
+    const option = document.createElement("option");
+    option.value = folder;
+    option.textContent = displaySaveFolderPath(folder);
+    playFolderInput.appendChild(option);
+  });
+  // 一覧から削除済みでも、読込中の既存作戦は元の保存先へ上書きできるよう一時表示します。
+  if (selectedFolder && !saveFolders.some((folder) => folder.toLocaleLowerCase("ja-JP") === selectedFolder.toLocaleLowerCase("ja-JP"))) {
+    const legacyOption = document.createElement("option");
+    legacyOption.value = selectedFolder;
+    legacyOption.textContent = `${displaySaveFolderPath(selectedFolder)}（既存作戦）`;
+    playFolderInput.appendChild(legacyOption);
+  }
+  if (playFolderInput.options.length === 0) {
+    const emptyOption = document.createElement("option");
+    emptyOption.value = "";
+    emptyOption.textContent = "フォルダを追加してください";
+    emptyOption.disabled = true;
+    emptyOption.selected = true;
+    playFolderInput.appendChild(emptyOption);
+  } else {
+    playFolderInput.value = selectedFolder || saveFolders[0] || "";
+  }
+}
+
+// 保存フォルダ一覧の編集行を描画します。
+function renderSaveFolderManager() {
+  if (!saveFolderManagerList) return;
+  saveFolderManagerList.innerHTML = "";
+  if (saveFolders.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "save-folder-manager-empty";
+    empty.textContent = "保存フォルダがありません。上の入力欄から追加してください。";
+    saveFolderManagerList.appendChild(empty);
+    return;
+  }
+  saveFolders.forEach((folder) => {
+    const row = document.createElement("div");
+    row.className = "save-folder-row";
+    const input = document.createElement("input");
+    input.className = "meta-input";
+    input.type = "text";
+    input.maxLength = 120;
+    input.value = folder;
+    input.setAttribute("aria-label", `${displaySaveFolderPath(folder)}の名前`);
+    const renameButton = document.createElement("button");
+    renameButton.type = "button";
+    renameButton.className = "icon-button";
+    renameButton.textContent = "✓";
+    renameButton.setAttribute("aria-label", `${displaySaveFolderPath(folder)}の名前を保存`);
+    renameButton.title = "名前変更を保存";
+    renameButton.addEventListener("click", () => renameSaveFolder(folder, input.value));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") renameSaveFolder(folder, input.value);
+    });
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "icon-button danger";
+    deleteButton.textContent = "🗑";
+    deleteButton.setAttribute("aria-label", `${displaySaveFolderPath(folder)}を一覧から削除`);
+    deleteButton.title = "一覧から削除";
+    deleteButton.addEventListener("click", () => deleteSaveFolder(folder));
+    row.appendChild(input);
+    row.appendChild(renameButton);
+    row.appendChild(deleteButton);
+    saveFolderManagerList.appendChild(row);
+  });
+}
+
+// 保存フォルダ一覧を端末へ保存し、接続中ならOneDriveへも同期します。
+async function applySaveFolders(nextFolders, options = {}) {
+  saveFolders = normalizeSaveFolderList(nextFolders);
+  saveFoldersUpdatedAt = String(options.updatedAt || new Date().toISOString());
+  writeSaveFolderRecord();
+  renderSaveFolderOptions(state?.libraryMeta?.folder || "");
+  renderSaveFolderManager();
+  syncLibraryFolderFilter(lastLibraryItems);
+  if (options.syncOneDrive !== false && window.OneDriveStorage?.isConnected() && window.OneDriveStorage?.saveFolderSettings) {
+    try {
+      setSaveFolderManagerStatus("OneDriveへ同期しています…");
+      const saved = await window.OneDriveStorage.saveFolderSettings(saveFolders);
+      // OneDrive側が記録した更新日時へ揃え、次回起動時の不要な競合判定を避けます。
+      saveFoldersUpdatedAt = String(saved?.updatedAt || saveFoldersUpdatedAt);
+      writeSaveFolderRecord();
+      setSaveFolderManagerStatus("この一覧はOneDrive経由で他の端末にも同期されます。");
+    } catch (error) {
+      console.warn("保存フォルダ一覧をOneDriveへ同期できませんでした。", error);
+      setSaveFolderManagerStatus("端末には保存しましたが、OneDriveへ同期できませんでした。", true);
+    }
+  } else if (options.status !== false) {
+    setSaveFolderManagerStatus("この端末へ保存しました。OneDrive接続後に他の端末へ同期されます。");
+  }
+}
+
+// OneDriveと端末の更新日時を比較し、新しい保存フォルダ一覧へ揃えます。
+async function syncSaveFoldersFromOneDrive() {
+  if (!window.OneDriveStorage?.isConnected() || !window.OneDriveStorage?.loadFolderSettings || !window.OneDriveStorage?.saveFolderSettings) return;
+  if (folderSettingsSyncPromise) return folderSettingsSyncPromise;
+  folderSettingsSyncPromise = (async () => {
+    try {
+      const remote = await window.OneDriveStorage.loadFolderSettings();
+      if (!remote) {
+        const saved = await window.OneDriveStorage.saveFolderSettings(saveFolders);
+        saveFoldersUpdatedAt = String(saved?.updatedAt || saveFoldersUpdatedAt || new Date().toISOString());
+        writeSaveFolderRecord();
+      } else {
+        const remoteUpdatedAt = String(remote.updatedAt || "");
+        if (!saveFoldersUpdatedAt || remoteUpdatedAt > saveFoldersUpdatedAt) {
+          const remoteFolders = normalizeSaveFolderList(remote.folders);
+          const currentFolder = normalizeSaveFolderPath(state.libraryMeta?.folder);
+          if (!autosaveStateRestored && !remoteFolders.some((folder) => folder.toLocaleLowerCase("ja-JP") === currentFolder.toLocaleLowerCase("ja-JP"))) {
+            state.libraryMeta = { ...(state.libraryMeta || {}), folder: remoteFolders[0] || "" };
+          }
+          await applySaveFolders(remote.folders, { updatedAt: remoteUpdatedAt, syncOneDrive: false, status: false });
+        } else if (saveFoldersUpdatedAt > remoteUpdatedAt) {
+          const saved = await window.OneDriveStorage.saveFolderSettings(saveFolders);
+          saveFoldersUpdatedAt = String(saved?.updatedAt || saveFoldersUpdatedAt);
+          writeSaveFolderRecord();
+        } else if (JSON.stringify(normalizeSaveFolderList(remote.folders)) !== JSON.stringify(saveFolders)) {
+          await applySaveFolders(remote.folders, { updatedAt: remoteUpdatedAt, syncOneDrive: false, status: false });
+        }
+      }
+      setSaveFolderManagerStatus("この一覧はOneDrive経由で他の端末にも同期されます。");
+    } catch (error) {
+      console.warn("OneDriveの保存フォルダ一覧を同期できませんでした。", error);
+      setSaveFolderManagerStatus("OneDriveとの同期に失敗しました。端末内の一覧を使用します。", true);
+    } finally {
+      folderSettingsSyncPromise = null;
+    }
+  })();
+  return folderSettingsSyncPromise;
+}
+
+// 入力された保存フォルダを一覧へ追加します。
+async function addSaveFolder() {
+  const result = validateSaveFolderPath(newSaveFolderInput?.value);
+  if (!result.valid) {
+    setSaveFolderManagerStatus(result.message, true);
+    newSaveFolderInput?.focus();
+    return;
+  }
+  if (saveFolders.some((folder) => folder.toLocaleLowerCase("ja-JP") === result.value.toLocaleLowerCase("ja-JP"))) {
+    setSaveFolderManagerStatus("同じ保存フォルダが既にあります。", true);
+    return;
+  }
+  state.libraryMeta = { ...(state.libraryMeta || {}), folder: result.value };
+  await applySaveFolders([...saveFolders, result.value]);
+  renderSaveFolderOptions(result.value);
+  if (newSaveFolderInput) newSaveFolderInput.value = "";
+  autosave();
+  showToast(`保存フォルダ「${displaySaveFolderPath(result.value)}」を追加しました`);
+}
+
+// 指定した保存フォルダ名を一覧上で変更します。
+async function renameSaveFolder(previousFolder, nextValue) {
+  const result = validateSaveFolderPath(nextValue);
+  if (!result.valid) {
+    setSaveFolderManagerStatus(result.message, true);
+    return;
+  }
+  const previousKey = previousFolder.toLocaleLowerCase("ja-JP");
+  const nextKey = result.value.toLocaleLowerCase("ja-JP");
+  if (saveFolders.some((folder) => folder.toLocaleLowerCase("ja-JP") === nextKey && folder.toLocaleLowerCase("ja-JP") !== previousKey)) {
+    setSaveFolderManagerStatus("変更後と同じ保存フォルダが既にあります。", true);
+    return;
+  }
+  const nextFolders = saveFolders.map((folder) => folder.toLocaleLowerCase("ja-JP") === previousKey ? result.value : folder);
+  if (normalizeSaveFolderPath(state.libraryMeta?.folder).toLocaleLowerCase("ja-JP") === previousKey) {
+    state.libraryMeta = { ...(state.libraryMeta || {}), folder: result.value };
+  }
+  await applySaveFolders(nextFolders);
+  autosave();
+  showToast(`保存フォルダ名を「${displaySaveFolderPath(result.value)}」へ変更しました`);
+}
+
+// 保存フォルダを一覧から外します。OneDrive上の既存データは削除しません。
+async function deleteSaveFolder(folder) {
+  if (!window.confirm(`「${displaySaveFolderPath(folder)}」を保存先一覧から削除しますか？\n\nOneDrive上の既存作戦や動画は削除されません。`)) return;
+  const folderKey = folder.toLocaleLowerCase("ja-JP");
+  const nextFolders = saveFolders.filter((item) => item.toLocaleLowerCase("ja-JP") !== folderKey);
+  if (normalizeSaveFolderPath(state.libraryMeta?.folder).toLocaleLowerCase("ja-JP") === folderKey) {
+    state.libraryMeta = { ...(state.libraryMeta || {}), folder: nextFolders[0] || "" };
+  }
+  await applySaveFolders(nextFolders);
+  autosave();
+  showToast(`保存フォルダ「${displaySaveFolderPath(folder)}」を一覧から削除しました`);
+}
+
+// 初回フォルダのうち削除済みのものだけを一覧へ追加します。
+async function restoreDefaultSaveFolders() {
+  const merged = normalizeSaveFolderList([...saveFolders, ...DEFAULT_SAVE_FOLDERS]);
+  if (merged.length === saveFolders.length) {
+    setSaveFolderManagerStatus("初期フォルダはすべて一覧にあります。");
+    return;
+  }
+  if (!state.libraryMeta?.folder) {
+    state.libraryMeta = { ...(state.libraryMeta || {}), folder: merged[0] || "" };
+  }
+  await applySaveFolders(merged);
+  autosave();
+  showToast("削除済みの初期フォルダを一覧へ追加しました");
+}
+
+// 保存フォルダ管理画面を開き、OneDriveの最新一覧を取得します。
+async function openSaveFolderManager() {
+  renderSaveFolderManager();
+  if (!saveFolderManagerDialog.open) saveFolderManagerDialog.showModal();
+  if (window.OneDriveStorage?.isConnected()) {
+    await syncSaveFoldersFromOneDrive();
+  } else {
+    setSaveFolderManagerStatus("この端末へ保存します。OneDrive接続後に他の端末へ同期されます。");
+  }
 }
 
 // 端末幅・タッチ操作と保存済み設定から初回レイアウトを決めます。
@@ -855,7 +1194,7 @@ function createInitialState() {
   // アプリ状態を返します。
   return {
     playName: "new play",
-    libraryMeta: { folder: "Shared", tags: [], favorite: false },
+    libraryMeta: { folder: getPreferredSaveFolder(), tags: [], favorite: false },
     courtMode: "half",
     courtRotation: 0,
     activeTool: "select",
@@ -1164,7 +1503,7 @@ function applySnapshot(snapshot) {
   state.playName = migrated.playName ?? "new play";
   // ライブラリ管理情報を復元します。
   state.libraryMeta = migrated.libraryMeta ?? { folder: "Shared", tags: [], favorite: false };
-  if (playFolderInput) playFolderInput.value = state.libraryMeta.folder || "Shared";
+  renderSaveFolderOptions(state.libraryMeta.folder || "Shared");
   if (playTagsInput) playTagsInput.value = (state.libraryMeta.tags || []).join(", ");
   if (playFavoriteInput) playFavoriteInput.checked = Boolean(state.libraryMeta.favorite);
   syncFavoriteHint();
@@ -4959,6 +5298,8 @@ function resetBoard() {
   selectedCanvasItem = null;
   // 作戦名入力欄を同期します。
   playNameInput.value = state.playName;
+  // 現在利用できる先頭保存フォルダへ選択欄を同期します。
+  renderSaveFolderOptions(state.libraryMeta.folder);
   // 画面を同期します。
   syncInterface();
   // 全面から半面へ戻った場合もCanvasの比率と変換情報を即時再計算します。
@@ -5456,6 +5797,7 @@ async function runBulkBackup() {
       formatVersion: BACKUP_FORMAT_VERSION,
       createdAt: new Date().toISOString(),
       appVersion: APP_VERSION,
+      saveFolders: saveFolders,
       playCount: result.plays.length,
       plays: result.plays
     };
@@ -5597,6 +5939,15 @@ async function restoreBackupFile(event) {
         failures.push({ name: item.name, reason: "OneDriveへ保存できませんでした。" });
       }
     }
+    // バックアップに保存された一覧と復元対象の保存先を、現在の一覧へ安全に追加します。
+    const restoredFolders = normalizeSaveFolderList([
+      ...saveFolders,
+      ...(Array.isArray(backup.saveFolders) ? backup.saveFolders : []),
+      ...validEntries.map((item) => item.folder)
+    ]);
+    if (JSON.stringify(restoredFolders) !== JSON.stringify(saveFolders)) {
+      await applySaveFolders(restoredFolders);
+    }
     const failureDetails = failures.slice(0, 6).map((failure) => `・${failure.name}：${failure.reason}`).join("\n");
     const summary = `復元成功：${result.success}件\n上書き：${result.overwritten}件\n別名保存：${result.renamed}件\nスキップ：${result.skipped}件\n失敗：${failures.length}件`;
     bulkTransferStatus.textContent = `${summary}${failureDetails ? `\n${failureDetails}` : ""}`;
@@ -5691,11 +6042,20 @@ async function requestFolderApi(path, options = {}) {
 async function savePlayToLibrary() {
   // 入力欄から作戦名を取得します。
   const name = playNameInput.value.trim() || "名称未設定の作戦";
+  // 利用者が選択した保存フォルダを取得します。
+  const selectedFolder = normalizeSaveFolderPath(playFolderInput?.value || state.libraryMeta?.folder);
+  // 保存フォルダがすべて削除されている場合は、先に追加を案内します。
+  if (!selectedFolder) {
+    await openSaveFolderManager();
+    setSaveFolderManagerStatus("作戦を保存するフォルダを追加してください。", true);
+    showToast("保存フォルダを追加してください");
+    return;
+  }
   // 状態へ作戦名を反映します。
   state.playName = name;
   // ライブラリ管理情報を入力欄から反映します。
   state.libraryMeta = {
-    folder: playFolderInput?.value || "Shared",
+    folder: selectedFolder,
     tags: String(playTagsInput?.value || "").split(",").map((tag) => tag.trim()).filter(Boolean),
     favorite: Boolean(playFavoriteInput?.checked)
   };
@@ -5804,7 +6164,11 @@ function savePlayToLocalLibrary() {
   // 既存ライブラリを取得します。
   const library = readLocalLibrary();
   // 同名作戦の位置を探します。
-  const existingIndex = library.findIndex((item) => item.name === name);
+  const targetFolder = normalizeSaveFolderPath(state.libraryMeta?.folder);
+  const existingIndex = library.findIndex((item) => (
+    item.name === name
+    && normalizeSaveFolderPath(item.snapshot?.libraryMeta?.folder) === targetFolder
+  ));
   if (existingIndex >= 0 && !confirmLibraryOverwrite([library[existingIndex]], name, state.libraryMeta?.folder || "Shared")) {
     showToast("保存をキャンセルしました");
     return;
@@ -5899,6 +6263,38 @@ async function readLibrary() {
   return readLocalLibrary();
 }
 
+// ライブラリ項目から保存フォルダ部分だけを取得します。
+function getLibraryItemFolder(item) {
+  const snapshotFolder = item?.snapshot?.libraryMeta?.folder;
+  if (snapshotFolder) return normalizeSaveFolderPath(snapshotFolder);
+  if (item?.folder) return normalizeSaveFolderPath(item.folder);
+  const pathParts = String(item?.relativePath || "").replace(/\\/g, "/").split("/").filter(Boolean);
+  if (pathParts.length > 0 && /\.json$/i.test(pathParts[pathParts.length - 1])) pathParts.pop();
+  return normalizeSaveFolderPath(pathParts.join("/"));
+}
+
+// 管理中の一覧と実際に保存済みの場所からライブラリ絞込欄を作ります。
+function syncLibraryFolderFilter(items = []) {
+  if (!libraryFolderFilter) return;
+  const selected = normalizeSaveFolderPath(libraryFolderFilter.value);
+  const observed = normalizeSaveFolderList((items || []).map(getLibraryItemFolder).filter(Boolean))
+    .filter((folder) => !saveFolders.some((saved) => saved.toLocaleLowerCase("ja-JP") === folder.toLocaleLowerCase("ja-JP")))
+    .sort((left, right) => left.localeCompare(right, "ja-JP"));
+  const choices = [...saveFolders, ...observed];
+  libraryFolderFilter.innerHTML = "";
+  const allOption = document.createElement("option");
+  allOption.value = "";
+  allOption.textContent = "すべてのフォルダ";
+  libraryFolderFilter.appendChild(allOption);
+  choices.forEach((folder) => {
+    const option = document.createElement("option");
+    option.value = folder;
+    option.textContent = displaySaveFolderPath(folder);
+    libraryFolderFilter.appendChild(option);
+  });
+  libraryFolderFilter.value = choices.includes(selected) ? selected : "";
+}
+
 // 保存済み作戦一覧を描画します。
 async function renderLibrary() {
   // 既存表示を消します。
@@ -5922,13 +6318,17 @@ async function renderLibrary() {
     libraryList.innerHTML = "";
     // 最新一覧を保持します。
     lastLibraryItems = library;
+    // 保存フォルダ絞込欄を現在の管理一覧と実データへ同期します。
+    syncLibraryFolderFilter(library);
     // 検索条件を適用します。
     const query = String(librarySearchInput?.value || "").trim().toLowerCase();
     const folderFilter = String(libraryFolderFilter?.value || "");
     const favoriteOnly = Boolean(libraryFavoriteOnly?.checked);
     const filteredLibrary = library.filter((item) => {
       const haystack = `${item.name || ""} ${item.relativePath || ""} ${(item.tags || []).join(" ")}`.toLowerCase();
-      return (!query || haystack.includes(query)) && (!folderFilter || String(item.relativePath || "").startsWith(folderFilter)) && (!favoriteOnly || item.favorite === true);
+      const itemFolder = getLibraryItemFolder(item);
+      const matchesFolder = !folderFilter || itemFolder === folderFilter || itemFolder.startsWith(`${folderFilter}/`);
+      return (!query || haystack.includes(query)) && matchesFolder && (!favoriteOnly || item.favorite === true);
     });
     // 保存作戦がない場合を処理します。
     if (filteredLibrary.length === 0) {
@@ -6192,6 +6592,8 @@ function restoreAutosave() {
     if (Array.isArray(snapshot.steps) && snapshot.steps.length > 0) {
       // 状態へ適用します。
       applySnapshot(snapshot);
+      // OneDrive同期時も読込中作戦の保存先を勝手に変えないよう記録します。
+      autosaveStateRestored = true;
     }
   } catch (error) {
     // 復元失敗をコンソールへ記録します。
@@ -6596,6 +6998,8 @@ connectOneDriveButton?.addEventListener("click", async () => {
       return;
     }
     await window.OneDriveStorage.signIn();
+    // 接続直後に端末側の保存フォルダ一覧もOneDriveと同期します。
+    await syncSaveFoldersFromOneDrive();
   } catch (error) {
     console.error("OneDriveへ接続できませんでした。", error);
     window.alert("OneDriveへ接続できませんでした。\n\n" + error.message);
@@ -6667,6 +7071,16 @@ if (librarySearchInput) librarySearchInput.addEventListener("input", renderLibra
 if (libraryFolderFilter) libraryFolderFilter.addEventListener("change", renderLibrary);
 if (libraryFavoriteOnly) libraryFavoriteOnly.addEventListener("change", renderLibrary);
 if (playFolderInput) playFolderInput.addEventListener("change", () => { state.libraryMeta = {...(state.libraryMeta||{}), folder: playFolderInput.value}; autosave(); });
+manageSaveFoldersButton?.addEventListener("click", openSaveFolderManager);
+document.getElementById("closeSaveFolderManagerButton")?.addEventListener("click", () => saveFolderManagerDialog.close());
+addSaveFolderButton?.addEventListener("click", addSaveFolder);
+newSaveFolderInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") addSaveFolder();
+});
+restoreDefaultSaveFoldersButton?.addEventListener("click", restoreDefaultSaveFolders);
+saveFolderManagerDialog?.addEventListener("click", (event) => {
+  if (event.target === saveFolderManagerDialog) saveFolderManagerDialog.close();
+});
 if (playTagsInput) playTagsInput.addEventListener("change", () => { state.libraryMeta = {...(state.libraryMeta||{}), tags: playTagsInput.value.split(",").map((tag)=>tag.trim()).filter(Boolean)}; autosave(); });
 if (playFavoriteInput) playFavoriteInput.addEventListener("change", () => {
   state.libraryMeta = { ...(state.libraryMeta || {}), favorite: playFavoriteInput.checked };
@@ -6683,6 +7097,7 @@ window.addEventListener("load", async () => {
     console.error("OneDriveの初期化に失敗しました。", error);
   }
   updateOneDriveInterface();
+  await syncSaveFoldersFromOneDrive();
   initializeFirstRunExperience();
 });
 document.getElementById("savePlayButton").addEventListener("click", savePlayToLibrary);
@@ -6763,6 +7178,10 @@ oneDriveDialog?.addEventListener("click", (event) => {
 setMobileLayout(getInitialMobileLayout(), false);
 // お気に入りアイコンの初回ヒントを設定します。
 syncFavoriteHint();
+// 利用者が編集した保存フォルダ一覧を初回選択欄へ反映します。
+renderSaveFolderOptions(state.libraryMeta.folder);
+renderSaveFolderManager();
+syncLibraryFolderFilter([]);
 // 自動保存状態を復元します。
 restoreAutosave();
 // 初期ツールを設定します。

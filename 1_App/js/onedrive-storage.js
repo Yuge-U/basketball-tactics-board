@@ -5,6 +5,7 @@ window.OneDriveStorage = (() => {
   const GRAPH_ROOT = "https://graph.microsoft.com/v1.0";
   const SCOPES = ["Files.ReadWrite.AppFolder"];
   const CLIENT_ID_KEY = "basketball-tactics-onedrive-client-id";
+  const SAVE_FOLDER_SETTINGS_FILE = "_save-folders.settings.json";
   const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const listeners = new Set();
 
@@ -305,6 +306,40 @@ window.OneDriveStorage = (() => {
     };
   }
 
+  // 端末間で共通利用する保存フォルダ一覧をアプリ専用領域へ保存します。
+  async function saveFolderSettings(folders) {
+    const root = await getAppRoot();
+    const payload = {
+      format: "basketball-tactics-save-folders",
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      folders: Array.isArray(folders) ? folders.map(String) : []
+    };
+    await graphRequest(
+      `/me/drive/items/${encodeURIComponent(root.id)}:/${encodeURIComponent(SAVE_FOLDER_SETTINGS_FILE)}:/content`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify(payload, null, 2)
+      }
+    );
+    return payload;
+  }
+
+  // OneDriveに保存済みの保存フォルダ一覧を読み込みます。
+  async function loadFolderSettings() {
+    const root = await getAppRoot();
+    const settingsFile = (await listChildren(root.id)).find((item) => (
+      item.file && item.name.toLowerCase() === SAVE_FOLDER_SETTINGS_FILE.toLowerCase()
+    ));
+    if (!settingsFile) return null;
+    const parsed = await loadJsonById(settingsFile.id);
+    if (parsed?.format !== "basketball-tactics-save-folders" || !Array.isArray(parsed.folders)) {
+      throw new OneDriveError("invalid-folder-settings", "OneDrive上の保存フォルダ設定を読み込めませんでした。");
+    }
+    return parsed;
+  }
+
   async function backupAll(onProgress) {
     const root = await getAppRoot();
     const files = await collectFiles(root.id);
@@ -421,7 +456,11 @@ window.OneDriveStorage = (() => {
       const relativePath = prefix ? `${prefix}/${item.name}` : item.name;
       if (item.folder) {
         files.push(...await collectFiles(item.id, relativePath));
-      } else if (item.file && item.name.toLowerCase().endsWith(".json")) {
+      } else if (
+        item.file
+        && item.name.toLowerCase().endsWith(".json")
+        && (prefix || item.name.toLowerCase() !== SAVE_FOLDER_SETTINGS_FILE.toLowerCase())
+      ) {
         files.push({ ...item, relativePath });
       }
     }
@@ -476,6 +515,8 @@ window.OneDriveStorage = (() => {
     signIn,
     signOut,
     save,
+    saveFolderSettings,
+    loadFolderSettings,
     backupAll,
     saveMedia,
     loadMedia,

@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v40-four-direction-court-rotation";
+const CACHE_NAME = "basketball-tactics-board-v41-editable-save-folders";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
