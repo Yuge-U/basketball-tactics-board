@@ -1,4 +1,4 @@
-/* Basketball Tactics Board - personal OneDrive storage via Microsoft Graph. */
+/* ZEROONE CANVAS - personal OneDrive storage via Microsoft Graph. */
 window.OneDriveStorage = (() => {
   "use strict";
 

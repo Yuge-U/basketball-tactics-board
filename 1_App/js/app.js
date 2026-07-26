@@ -168,7 +168,7 @@ const DEFAULT_SAVE_FOLDERS = Object.freeze([
   "U15/Practice"
 ]);
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v41";
+const APP_VERSION = "v42";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -5819,7 +5819,7 @@ async function runBulkBackup() {
 
 function validateBackupFile(parsed) {
   if (!parsed || typeof parsed !== "object" || parsed.format !== BACKUP_FORMAT) {
-    throw new Error("このファイルはBasketball Tactics Boardの一括バックアップ形式ではありません。");
+    throw new Error("このファイルはZEROONE CANVASの一括バックアップ形式ではありません。");
   }
   if (Number(parsed.formatVersion) !== BACKUP_FORMAT_VERSION) {
     throw new Error(`このバックアップの形式バージョン（${parsed.formatVersion ?? "不明"}）には対応していません。`);

@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "basketball-tactics-board-v41-editable-save-folders";
+const CACHE_NAME = "zeroone-canvas-v42-brand-refresh";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

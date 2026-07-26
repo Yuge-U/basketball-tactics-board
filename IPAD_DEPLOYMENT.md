@@ -9,7 +9,7 @@
 
 1. iPadのSafariでGitHub Pagesの公開URLを開きます。
 2. 共有ボタンから「ホーム画面に追加」を押します。
-3. 追加された「Tactics Board」を開きます。
+3. 追加された「ZEROONE」を開きます。
 4. 上部の「OneDrive接続」を押し、保存に使う個人用Microsoftアカウントでサインインします。
 
 ## 3. 保存と読み込み
