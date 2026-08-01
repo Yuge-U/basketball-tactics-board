@@ -149,6 +149,11 @@ const MEDIA_DATABASE_NAME = "basketball-tactics-media-v1";
 const MEDIA_STORE_NAME = "assets";
 // 作戦ライブラリに使うキーを定義します。
 const LIBRARY_KEY = "basketball-tactics-library-v1";
+// OneDrive作戦本体を端末へ先読み保存するIndexedDBです。
+const LIBRARY_CACHE_DATABASE_NAME = "basketball-tactics-library-cache-v1";
+const LIBRARY_CACHE_STORE_NAME = "libraries";
+// この時間を過ぎたキャッシュは表示に使いながらバックグラウンド更新します。
+const LIBRARY_CACHE_MAX_AGE = 2 * 60 * 1000;
 // モバイル表示の選択を端末ごとに保持するキーです。
 const MOBILE_LAYOUT_KEY = "basketball-tactics-mobile-layout-v1";
 // 利用者が編集できる保存フォルダ一覧を端末へ保持します。
@@ -168,7 +173,7 @@ const DEFAULT_SAVE_FOLDERS = Object.freeze([
   "U15/Practice"
 ]);
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v43";
+const APP_VERSION = "v44";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -500,6 +505,11 @@ let termsRequired = false;
 let guidePageIndex = 0;
 let bulkTransferInProgress = false;
 let lastLibraryItems = [];
+let libraryCacheHydrated = false;
+let libraryCacheKnown = false;
+let libraryCacheFetchedAt = 0;
+let libraryPreloadPromise = null;
+let libraryCacheAccountKey = "";
 const initialSaveFolderRecord = readSaveFolderRecord();
 let saveFolders = initialSaveFolderRecord.folders;
 let saveFoldersUpdatedAt = initialSaveFolderRecord.updatedAt;
@@ -6108,7 +6118,7 @@ async function restoreBackupFile(event) {
       return;
     }
     bulkTransferStatus.textContent = "OneDriveの保存済み作戦を確認しています…";
-    const existing = await window.OneDriveStorage.list();
+    const existing = await preloadOneDriveLibrary(true);
     const occupiedPaths = new Set(existing.map((item) => String(item.relativePath || "").replace(/\\/g, "/").toLocaleLowerCase("ja-JP")));
     const result = { success: 0, overwritten: 0, renamed: 0, skipped: 0 };
     for (let index = 0; index < validEntries.length; index += 1) {
@@ -6153,6 +6163,9 @@ async function restoreBackupFile(event) {
     ]);
     if (JSON.stringify(restoredFolders) !== JSON.stringify(saveFolders)) {
       await applySaveFolders(restoredFolders);
+    }
+    if (result.success > 0) {
+      await preloadOneDriveLibrary(true);
     }
     const failureDetails = failures.slice(0, 6).map((failure) => `・${failure.name}：${failure.reason}`).join("\n");
     const summary = `復元成功：${result.success}件\n上書き：${result.overwritten}件\n別名保存：${result.renamed}件\nスキップ：${result.skipped}件\n失敗：${failures.length}件`;
@@ -6278,7 +6291,8 @@ async function savePlayToLibrary() {
       return;
     }
     try {
-      const library = await window.OneDriveStorage.list();
+      // 起動時に先読みした一覧を使い、保存確認のための全件再読込を避けます。
+      const library = await readLibrary();
       if (!confirmLibraryOverwrite(library, name, state.libraryMeta.folder)) {
         showToast("保存をキャンセルしました");
         return;
@@ -6286,6 +6300,18 @@ async function savePlayToLibrary() {
       const videoSync = await syncVideosToOneDrive(state.libraryMeta.folder, name);
       const payload = createExportPayload();
       const result = await window.OneDriveStorage.save(state.libraryMeta.folder, name, payload);
+      // 保存結果を端末キャッシュへ即反映し、次回一覧表示と読込を通信なしにします。
+      upsertLibraryCacheItem({
+        id: result.id,
+        name,
+        relativePath: result.relativePath,
+        updatedAt: result.updatedAt || new Date().toISOString(),
+        stepCount: payload.snapshot.steps.length,
+        tags: [...state.libraryMeta.tags],
+        favorite: state.libraryMeta.favorite,
+        snapshot: payload.snapshot,
+        source: "onedrive"
+      });
       autosave();
       const videoMessage = videoSync.total > 0
         ? `（動画${videoSync.total}件を同期${videoSync.uploaded > 0 ? `・新規${videoSync.uploaded}件` : ""}）`
@@ -6428,6 +6454,130 @@ function readLocalLibrary() {
   }
 }
 
+// 接続中アカウントごとのライブラリキャッシュキーを返します。
+function getLibraryCacheAccountKey() {
+  const status = window.OneDriveStorage?.status?.() || {};
+  const account = String(status.username || status.name || "default").trim().toLocaleLowerCase("ja-JP");
+  return `onedrive:${account}`;
+}
+
+// 先読み済み作戦を保存するIndexedDBを開きます。
+function openLibraryCacheDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      reject(new Error("この端末は作戦の先読み保存に対応していません"));
+      return;
+    }
+    const request = window.indexedDB.open(LIBRARY_CACHE_DATABASE_NAME, 1);
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(LIBRARY_CACHE_STORE_NAME)) {
+        database.createObjectStore(LIBRARY_CACHE_STORE_NAME);
+      }
+    });
+    request.addEventListener("success", () => resolve(request.result), { once: true });
+    request.addEventListener("error", () => reject(request.error ?? new Error("作戦キャッシュを開けませんでした")), { once: true });
+  });
+}
+
+// 現在アカウントの端末キャッシュを読み込みます。
+async function hydrateLibraryCache() {
+  const accountKey = getLibraryCacheAccountKey();
+  if (libraryCacheHydrated && libraryCacheAccountKey === accountKey) return lastLibraryItems;
+  libraryCacheHydrated = true;
+  libraryCacheAccountKey = accountKey;
+  libraryCacheKnown = false;
+  lastLibraryItems = [];
+  libraryCacheFetchedAt = 0;
+  try {
+    const database = await openLibraryCacheDatabase();
+    try {
+      const record = await new Promise((resolve, reject) => {
+        const request = database.transaction(LIBRARY_CACHE_STORE_NAME, "readonly").objectStore(LIBRARY_CACHE_STORE_NAME).get(accountKey);
+        request.addEventListener("success", () => resolve(request.result ?? null), { once: true });
+        request.addEventListener("error", () => reject(request.error ?? new Error("作戦キャッシュを読み込めませんでした")), { once: true });
+      });
+      if (record && Array.isArray(record.items)) {
+        lastLibraryItems = record.items;
+        libraryCacheFetchedAt = Number(record.fetchedAt) || 0;
+        libraryCacheKnown = true;
+      }
+    } finally {
+      database.close();
+    }
+  } catch (error) {
+    console.warn("端末の作戦キャッシュを利用できませんでした。", error);
+  }
+  return lastLibraryItems;
+}
+
+// 現在のOneDrive一覧と作戦本体を端末へ保存します。
+async function persistLibraryCache() {
+  if (!window.indexedDB || !libraryCacheAccountKey) return;
+  try {
+    const database = await openLibraryCacheDatabase();
+    try {
+      await new Promise((resolve, reject) => {
+        const transaction = database.transaction(LIBRARY_CACHE_STORE_NAME, "readwrite");
+        transaction.objectStore(LIBRARY_CACHE_STORE_NAME).put({
+          fetchedAt: libraryCacheFetchedAt,
+          items: lastLibraryItems
+        }, libraryCacheAccountKey);
+        transaction.addEventListener("complete", resolve, { once: true });
+        transaction.addEventListener("error", () => reject(transaction.error ?? new Error("作戦キャッシュを保存できませんでした")), { once: true });
+      });
+    } finally {
+      database.close();
+    }
+  } catch (error) {
+    console.warn("作戦の先読み結果を端末へ保存できませんでした。", error);
+  }
+}
+
+// キャッシュの期限を判定します。
+function isLibraryCacheStale() {
+  return !libraryCacheKnown || Date.now() - libraryCacheFetchedAt >= LIBRARY_CACHE_MAX_AGE;
+}
+
+// OneDriveの更新日時を確認し、変更されたJSONだけを読み込んでキャッシュを更新します。
+async function preloadOneDriveLibrary(force = false) {
+  if (!window.OneDriveStorage?.isConnected()) return lastLibraryItems;
+  await hydrateLibraryCache();
+  if (!force && !isLibraryCacheStale()) return lastLibraryItems;
+  if (libraryPreloadPromise) return libraryPreloadPromise;
+  libraryPreloadPromise = (async () => {
+    const library = await window.OneDriveStorage.list({ cachedItems: lastLibraryItems });
+    lastLibraryItems = library;
+    libraryCacheFetchedAt = Date.now();
+    libraryCacheKnown = true;
+    syncLibraryFolderFilter(library);
+    await persistLibraryCache();
+    return library;
+  })().finally(() => {
+    libraryPreloadPromise = null;
+  });
+  return libraryPreloadPromise;
+}
+
+// 保存直後の作戦を通信なしで一覧キャッシュへ反映します。
+function upsertLibraryCacheItem(item) {
+  const index = lastLibraryItems.findIndex((saved) => saved.id === item.id || saved.relativePath === item.relativePath);
+  if (index >= 0) lastLibraryItems.splice(index, 1, item);
+  else lastLibraryItems.push(item);
+  lastLibraryItems.sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
+  libraryCacheFetchedAt = Date.now();
+  libraryCacheKnown = true;
+  void persistLibraryCache();
+}
+
+// 削除済み作戦を一覧キャッシュから除きます。
+function removeLibraryCacheItem(item) {
+  lastLibraryItems = lastLibraryItems.filter((saved) => saved.id !== item.id);
+  libraryCacheFetchedAt = Date.now();
+  libraryCacheKnown = true;
+  void persistLibraryCache();
+}
+
 // 保存済み作戦一覧を表示します。
 async function openLibrary() {
   // 公開版でOneDrive未接続の場合は、先に接続設定を案内します。
@@ -6435,20 +6585,28 @@ async function openLibrary() {
     openOneDriveSettings();
     return;
   }
-  // 先にダイアログを開きます。
+  // 先にダイアログを開き、端末キャッシュを即時表示します。
   libraryDialog.showModal();
-  // 最新のフォルダ内容を読み込みます。
-  await renderLibrary();
+  await hydrateLibraryCache();
+  await renderLibrary({ cacheOnly: true });
+  // 古いキャッシュだけを表示している場合は裏で差分更新します。
+  if (window.OneDriveStorage?.isConnected() && isLibraryCacheStale()) {
+    void preloadOneDriveLibrary().then(() => {
+      if (libraryDialog.open) void renderLibrary({ cacheOnly: true });
+    }).catch((error) => console.warn("OneDrive作戦の先読みに失敗しました。", error));
+  }
 }
 
 // 保存済み作戦一覧を取得します。
-async function readLibrary() {
+async function readLibrary(options = {}) {
   // OneDrive設定済みの場合は、どの端末でも共通のライブラリを取得します。
   if (window.OneDriveStorage?.isConfigured()) {
     if (!window.OneDriveStorage.isConnected()) {
       throw new Error("OneDriveへ接続してください。");
     }
-    return await window.OneDriveStorage.list();
+    await hydrateLibraryCache();
+    if (options.cacheOnly && libraryCacheKnown) return lastLibraryItems;
+    return await preloadOneDriveLibrary(Boolean(options.forceRefresh));
   }
   // 公開Web版はOneDrive設定が完了するまでライブラリを表示しません。
   if (isHostedWebApp()) {
@@ -6502,7 +6660,7 @@ function syncLibraryFolderFilter(items = []) {
 }
 
 // 保存済み作戦一覧を描画します。
-async function renderLibrary() {
+async function renderLibrary(options = {}) {
   // 既存表示を消します。
   libraryList.innerHTML = "";
   // 読込中表示を作ります。
@@ -6519,7 +6677,7 @@ async function renderLibrary() {
   libraryList.appendChild(loading);
   try {
     // 保存済み作戦を取得します。
-    const library = await readLibrary();
+    const library = await readLibrary(options);
     // 読込中表示を消します。
     libraryList.innerHTML = "";
     // 最新一覧を保持します。
@@ -6650,9 +6808,11 @@ async function loadLibraryItem(item) {
     // 読込対象のスナップショットを保持します。
     let snapshot = item.snapshot;
     // フォルダ保存データの場合はAPIからJSON本体を取得します。
-    if (item.source === "onedrive") {
+    if (item.source === "onedrive" && (!Array.isArray(snapshot?.steps) || snapshot.steps.length === 0)) {
       const result = await window.OneDriveStorage.load(item);
       snapshot = result?.snapshot ?? result;
+      item.snapshot = snapshot;
+      upsertLibraryCacheItem(item);
     } else if (item.source === "folder") {
       const result = await requestFolderApi(`/load?file=${encodeURIComponent(item.relativePath)}`);
       snapshot = result.data?.snapshot ?? result.data;
@@ -6697,6 +6857,7 @@ async function deleteLibraryItem(item) {
     // フォルダ保存データの場合はAPIから削除します。
     if (item.source === "onedrive") {
       await window.OneDriveStorage.remove(item);
+      removeLibraryCacheItem(item);
     } else if (item.source === "browser-folder") {
       await window.PlayFolderAccess.remove(item);
     } else if (item.source === "folder") {
@@ -6716,7 +6877,7 @@ async function deleteLibraryItem(item) {
       localStorage.setItem(LIBRARY_KEY, JSON.stringify(nextLibrary));
     }
     // 一覧を再描画します。
-    await renderLibrary();
+    await renderLibrary({ cacheOnly: item.source === "onedrive" });
     // 結果を通知します。
     showToast(item.source === "onedrive"
       ? "作戦JSONを削除しました（関連動画はOneDriveに残しています）"
@@ -7277,10 +7438,11 @@ disconnectOneDriveButton?.addEventListener("click", async () => {
   }
 });
 
-if (refreshLibraryButton) refreshLibraryButton.addEventListener("click", renderLibrary);
-if (librarySearchInput) librarySearchInput.addEventListener("input", renderLibrary);
-if (libraryFolderFilter) libraryFolderFilter.addEventListener("change", renderLibrary);
-if (libraryFavoriteOnly) libraryFavoriteOnly.addEventListener("change", renderLibrary);
+if (refreshLibraryButton) refreshLibraryButton.addEventListener("click", () => renderLibrary({ forceRefresh: true }));
+// 検索・フォルダ・お気に入り切替は先読み済み一覧だけを絞り込み、OneDriveへ再通信しません。
+if (librarySearchInput) librarySearchInput.addEventListener("input", () => renderLibrary({ cacheOnly: true }));
+if (libraryFolderFilter) libraryFolderFilter.addEventListener("change", () => renderLibrary({ cacheOnly: true }));
+if (libraryFavoriteOnly) libraryFavoriteOnly.addEventListener("change", () => renderLibrary({ cacheOnly: true }));
 if (playFolderInput) playFolderInput.addEventListener("change", () => { state.libraryMeta = {...(state.libraryMeta||{}), folder: playFolderInput.value}; autosave(); });
 manageSaveFoldersButton?.addEventListener("click", openSaveFolderManager);
 document.getElementById("closeSaveFolderManagerButton")?.addEventListener("click", () => saveFolderManagerDialog.close());
@@ -7309,6 +7471,13 @@ window.addEventListener("load", async () => {
   }
   updateOneDriveInterface();
   await syncSaveFoldersFromOneDrive();
+  // 起動直後に端末キャッシュを復元し、OneDriveの変更分だけをバックグラウンドで先読みします。
+  if (window.OneDriveStorage?.isConnected()) {
+    await hydrateLibraryCache();
+    void preloadOneDriveLibrary().then(() => {
+      if (libraryDialog.open) void renderLibrary({ cacheOnly: true });
+    }).catch((error) => console.warn("OneDrive作戦の起動時先読みに失敗しました。", error));
+  }
   initializeFirstRunExperience();
 });
 document.getElementById("savePlayButton").addEventListener("click", savePlayToLibrary);

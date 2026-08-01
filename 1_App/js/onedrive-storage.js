@@ -302,7 +302,8 @@ window.OneDriveStorage = (() => {
     );
     return {
       id: uploaded.id,
-      relativePath: `${String(folder || "Shared").replace(/^\/+|\/+$/g, "")}/${filename}`
+      relativePath: `${String(folder || "Shared").replace(/^\/+|\/+$/g, "")}/${filename}`,
+      updatedAt: uploaded.lastModifiedDateTime || new Date().toISOString()
     };
   }
 
@@ -472,14 +473,27 @@ window.OneDriveStorage = (() => {
     return JSON.parse(text);
   }
 
-  async function list() {
+  async function list(options = {}) {
     const root = await getAppRoot();
     const files = await collectFiles(root.id);
+    // 端末に先読み済みのJSONは、OneDriveの更新日時が同じなら再ダウンロードしません。
+    const cachedById = new Map((Array.isArray(options.cachedItems) ? options.cachedItems : [])
+      .filter((item) => item?.id && item?.snapshot)
+      .map((item) => [String(item.id), item]));
     const results = [];
     for (let index = 0; index < files.length; index += 4) {
       const batch = files.slice(index, index + 4);
       const parsed = await Promise.all(batch.map(async (file) => {
         try {
+          const cached = cachedById.get(String(file.id));
+          if (cached && String(cached.updatedAt || "") === String(file.lastModifiedDateTime || "")) {
+            return {
+              ...cached,
+              relativePath: file.relativePath,
+              updatedAt: file.lastModifiedDateTime,
+              source: "onedrive"
+            };
+          }
           const data = await loadJsonById(file.id);
           const snapshot = data?.snapshot || data;
           return {
@@ -490,6 +504,8 @@ window.OneDriveStorage = (() => {
             stepCount: Array.isArray(snapshot?.steps) ? snapshot.steps.length : 0,
             tags: Array.isArray(snapshot?.libraryMeta?.tags) ? snapshot.libraryMeta.tags : [],
             favorite: Boolean(snapshot?.libraryMeta?.favorite),
+            // 一覧取得時に読んだ本体を保持し、開く時の二重読込を防ぎます。
+            snapshot,
             source: "onedrive"
           };
         } catch (error) {
