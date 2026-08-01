@@ -19,7 +19,7 @@ const LEGACY_HALF_COURT = { width: 1000, height: 600 };
 // 旧版の全面コート論理サイズを移行処理用に定義します。
 const LEGACY_FULL_COURT = { width: 1200, height: 700 };
 // 保存データの構造バージョンを定義します。
-const SCHEMA_VERSION = 17;
+const SCHEMA_VERSION = 18;
 // 選手マーカーの大・中・小サイズを定義します。
 const PLAYER_SIZES = {
   // 旧「小」を新しい「大」として使います。
@@ -168,7 +168,7 @@ const DEFAULT_SAVE_FOLDERS = Object.freeze([
   "U15/Practice"
 ]);
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v42";
+const APP_VERSION = "v43";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -351,7 +351,7 @@ function assignDefaultPlayOrders(step, onlyMissing = false) {
     return;
   }
   // 次のボール動作に使う順番を初期化します。
-  let nextBallOrder = 1;
+  const nextBallOrder = {};
   // 選手ごとの直前動作順を保持します。
   const lastPlayerOrder = {};
   // 描画順に戦術線を確認します。
@@ -363,15 +363,18 @@ function assignDefaultPlayOrders(step, onlyMissing = false) {
     }
     // 対象選手の次に使える順番を計算します。
     const nextPlayerOrder = line.playerId ? (lastPlayerOrder[line.playerId] ?? 0) + 1 : 1;
+    // 複数ボールはIDごとに独立した動作順を持ちます。旧データは主ボールへ結び付けます。
+    const ballId = getLineBallId(step, line);
+    const nextOrderForBall = nextBallOrder[ballId] ?? 1;
     // 線種に応じた初期順番を保持します。
     let suggestedOrder = 1;
     // パスの場合はボール動作の次順を使います。
     if (line.type === "pass") {
       // ボール動作の次順を設定します。
-      suggestedOrder = nextBallOrder;
+      suggestedOrder = nextOrderForBall;
     } else if (isDribbleLineType(line.type)) {
       // ドリブルはボール順と同じ選手の直前動作順の両方を守ります。
-      suggestedOrder = Math.max(nextBallOrder, nextPlayerOrder);
+      suggestedOrder = Math.max(nextOrderForBall, nextPlayerOrder);
     } else {
       // 移動とスクリーンは別選手なら同時の1、同じ選手なら次順にします。
       suggestedOrder = Math.max(1, nextPlayerOrder);
@@ -383,7 +386,7 @@ function assignDefaultPlayOrders(step, onlyMissing = false) {
     // ボール動作の場合は次のボール順を更新します。
     if (isBallSequenceLineType(line.type)) {
       // 現在順より後になるよう更新します。
-      nextBallOrder = Math.max(nextBallOrder, line.playOrder + 1);
+      nextBallOrder[ballId] = Math.max(nextOrderForBall, line.playOrder + 1);
     }
     // 選手動作の場合は選手ごとの直前順を更新します。
     if (line.playerId && isMovementLineType(line.type)) {
@@ -541,6 +544,7 @@ const defenseNumberGrid = document.getElementById("defenseNumberGrid");
 // 選手人数の表示欄を取得します。
 const offensePlayerCount = document.getElementById("offensePlayerCount");
 const defensePlayerCount = document.getElementById("defensePlayerCount");
+const ballCount = document.getElementById("ballCount");
 // 全番号の開閉要素を取得します。
 const playerNumberDetails = document.getElementById("playerNumberDetails");
 const playerNumberDetailsToggle = document.getElementById("playerNumberDetailsToggle");
@@ -1212,12 +1216,59 @@ function createInitialState() {
   };
 }
 
+// STEP内のボール配列を後方互換形式から補い、主ボールを従来のball項目へ同期します。
+function normalizeStepBalls(step) {
+  if (!step) {
+    return [];
+  }
+  const source = Array.isArray(step.balls) && step.balls.length > 0
+    ? step.balls
+    : step.ball
+      ? [step.ball]
+      : [{ id: "ball", x: 0, y: 0 }];
+  const usedIds = new Set();
+  const balls = source.map((ball, index) => {
+    const normalizedBall = ball && typeof ball === "object" ? ball : {};
+    let id = String(normalizedBall.id || (index === 0 ? "ball" : makeId("ball")));
+    if (usedIds.has(id)) {
+      id = makeId("ball");
+    }
+    usedIds.add(id);
+    normalizedBall.id = id;
+    normalizedBall.label = String(normalizedBall.label || index + 1);
+    normalizedBall.x = Number(normalizedBall.x) || 0;
+    normalizedBall.y = Number(normalizedBall.y) || 0;
+    return normalizedBall;
+  });
+  step.balls = balls;
+  step.ball = balls[0];
+  return balls;
+}
+
+// STEP内の全ボールを返します。旧JSONの単一ballもここで自動移行します。
+function getStepBalls(step) {
+  return normalizeStepBalls(step);
+}
+
+// 従来機能が参照する主ボールを返します。
+function getPrimaryBall(step) {
+  return getStepBalls(step)[0];
+}
+
+// 線に対応するボールIDを返し、旧線は主ボールへ結び付けます。
+function getLineBallId(step, line) {
+  const balls = getStepBalls(step);
+  const requestedId = String(line?.ballId || "");
+  return balls.some((ball) => ball.id === requestedId) ? requestedId : balls[0]?.id || "ball";
+}
+
 // 初期配置のSTEPを作ります。
 function createDefaultStep(number, size) {
   // コート幅を短い変数へ格納します。
   const width = size.width;
   // コート高さを短い変数へ格納します。
   const height = size.height;
+  const primaryBall = { id: "ball", label: "1", x: width * 0.54, y: height * 0.78 };
   // STEPデータを返します。
   return {
     id: makeId("step"),
@@ -1230,7 +1281,9 @@ function createDefaultStep(number, size) {
       { id: "o4", side: "offense", label: "4", x: width * 0.35, y: height * 0.36 },
       { id: "o5", side: "offense", label: "5", x: width * 0.65, y: height * 0.36 }
     ],
-    ball: { id: "ball", x: width * 0.54, y: height * 0.78 },
+    // ballは旧版互換、ballsは複数ボール対応の正式データです。
+    ball: primaryBall,
+    balls: [primaryBall],
     cones: [],
     lines: [],
     texts: [],
@@ -1342,13 +1395,12 @@ function migrateSnapshot(snapshot) {
         // 選手のY座標を変換します。
         player.y *= scaleY;
       });
-      // ボールがある場合は座標を変換します。
-      if (step.ball) {
-        // ボールのX座標を変換します。
-        step.ball.x *= scaleX;
-        // ボールのY座標を変換します。
-        step.ball.y *= scaleY;
-      }
+      // 複数ボール形式は各ボール、旧形式は単一ボールの座標を変換します。
+      const savedBalls = Array.isArray(step.balls) && step.balls.length > 0 ? step.balls : step.ball ? [step.ball] : [];
+      savedBalls.forEach((ball) => {
+        ball.x *= scaleX;
+        ball.y *= scaleY;
+      });
       // 全コーンの座標を新しい寸法へ変換します。
       (step.cones ?? []).forEach((cone) => {
         // コーンのX座標を変換します。
@@ -1393,6 +1445,8 @@ function migrateSnapshot(snapshot) {
   }
   // 全STEPの不足項目を補います。
   (migrated.steps ?? []).forEach((step) => {
+    // 旧版の単一ボールを複数ボール配列へ移し、主ボール互換項目も維持します。
+    const balls = normalizeStepBalls(step);
     // コーン配列がなければ空配列を設定します。
     step.cones = Array.isArray(step.cones) ? step.cones : [];
     // 保存済みコーンの不足項目を補います。
@@ -1456,6 +1510,10 @@ function migrateSnapshot(snapshot) {
       }
       // 有効な色名でなければ黒へ戻します。
       line.color = LINE_COLORS[line.color] ? line.color : "black";
+      // 旧版のパス・ドリブルは従来の主ボールへ結び付けます。
+      if (isBallSequenceLineType(line.type)) {
+        line.ballId = balls.some((ball) => ball.id === line.ballId) ? line.ballId : balls[0].id;
+      }
     });
     // 旧版データや順番未設定の線へ初期再生順を補います。
     assignDefaultPlayOrders(step, true);
@@ -1760,8 +1818,9 @@ function render() {
     step.players.filter((player) => player.side === "defense").forEach((player) => drawPlayer(context, getPlaybackPlayer(player, step.id), player.id === activeInteractionPlayerId));
     // 攻撃マーカーを後に描きます。
     step.players.filter((player) => player.side === "offense").forEach((player) => drawPlayer(context, getPlaybackPlayer(player, step.id), player.id === activeInteractionPlayerId));
-    // ボールを描きます。
-    drawBall(context, getPlaybackBall(step.ball, step.id));
+    // 全ボールを描きます。複数時は番号で識別できるようにします。
+    const balls = getStepBalls(step);
+    balls.forEach((ball) => drawBall(context, getPlaybackBall(ball, step.id), balls.length > 1 ? ball.label : ""));
     // コート上へ配置したテキストを最前面に描きます。
     step.texts.forEach((textItem) => drawCourtText(context, textItem));
     // 選択中のテキスト・画像・動画へ変形ハンドルを描きます。
@@ -1808,11 +1867,15 @@ function getPlaybackPlayer(player, stepId) {
 // 再生中のボール位置があれば表示用に合成します。
 function getPlaybackBall(ball, stepId) {
   // 再生中のSTEPと一致しない場合は元のボールを返します。
-  if (!playbackVisual || playbackVisual.stepId !== stepId || !playbackVisual.ball) {
+  if (!playbackVisual || playbackVisual.stepId !== stepId) {
+    return ball;
+  }
+  const position = playbackVisual.balls?.[ball.id] || (ball.id === "ball" ? playbackVisual.ball : null);
+  if (!position) {
     return ball;
   }
   // 元データへ再生位置だけを重ねて返します。
-  return { ...ball, ...playbackVisual.ball };
+  return { ...ball, ...position };
 }
 
 // コートを描きます。
@@ -2324,7 +2387,7 @@ function drawPlayer(ctx, player, isActive = false) {
 }
 
 // ボールを描きます。
-function drawBall(ctx, ball) {
+function drawBall(ctx, ball, label = "") {
   const ballRadius = getBallRadius();
   // ボール以外の描画設定へ影響しないように現在状態を保存します。
   ctx.save();
@@ -2394,6 +2457,24 @@ function drawBall(ctx, ball) {
   );
   ctx.stroke();
   ctx.restore();
+  // 複数ボール時だけ小さな番号バッジを重ね、動作対象を判別できるようにします。
+  if (label) {
+    const badgeRadius = Math.max(6, ballRadius * 0.58);
+    const badgeX = ball.x + ballRadius * 0.78;
+    const badgeY = ball.y - ballRadius * 0.78;
+    ctx.beginPath();
+    ctx.fillStyle = "rgba(17, 24, 39, 0.92)";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = Math.max(1, 1.3 / Math.max(0.01, viewport.scale));
+    ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${Math.max(8, badgeRadius * 1.25)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(label), badgeX, badgeY + 0.5);
+  }
   // 描画前の設定へ戻します。
   ctx.restore();
 }
@@ -3047,9 +3128,10 @@ function findDraggableAt(point) {
     // テキスト対象情報を返します。
     return { type: "text", id: textItem.id };
   }
-  // ボールに近い場合はボールを返します。
-  if (distance(point, step.ball) <= getBallRadius() + 12 / Math.max(0.01, viewport.scale)) {
-    return { type: "ball", id: step.ball.id };
+  // 後に描いたボールから逆順で探します。
+  const ball = [...getStepBalls(step)].reverse().find((item) => distance(point, item) <= getBallRadius() + 16 / Math.max(0.01, viewport.scale));
+  if (ball) {
+    return { type: "ball", id: ball.id };
   }
   // 後に描いた選手から逆順で探します。
   const player = [...step.players].reverse().find((item) => distance(point, item) <= getPlayerRadius() + 10);
@@ -3144,8 +3226,37 @@ function findPlayerAt(point) {
   if (!step) {
     return null;
   }
-  // 描画順の後ろから選手を探します。
-  return [...step.players].reverse().find((player) => distance(point, player) <= getPlayerRadius() + 16) ?? null;
+  // 描画済み動作の終点を優先し、同じ選手の次動作をその終点から続けられるようにします。
+  const plannedPlayers = calculateStepEndState(step).players;
+  const reversedPlayers = [...step.players].reverse();
+  const plannedPlayer = reversedPlayers.find((player) => plannedPlayers[player.id] && distance(point, plannedPlayers[player.id]) <= getPlayerRadius() + 16);
+  if (plannedPlayer) {
+    return { ...plannedPlayer, ...plannedPlayers[plannedPlayer.id] };
+  }
+  // 元マーカーを押した場合も次動作はその選手の現在予定終点から開始します。
+  const originalPlayer = reversedPlayers.find((player) => distance(point, player) <= getPlayerRadius() + 16) ?? null;
+  return originalPlayer ? { ...originalPlayer, ...(plannedPlayers[originalPlayer.id] || {}) } : null;
+}
+
+// 指定位置に近い予定ボールを返します。複数時のパス対象選択に使います。
+function findPlannedBallAt(point, step, ballPositions) {
+  const balls = getStepBalls(step);
+  const threshold = getBallRadius() + 20 / Math.max(0.01, viewport.scale);
+  const planned = [...balls].reverse().find((ball) => ballPositions[ball.id] && distance(point, ballPositions[ball.id]) <= threshold);
+  if (planned) {
+    return { ...planned, ...ballPositions[planned.id] };
+  }
+  const original = [...balls].reverse().find((ball) => distance(point, ball) <= threshold);
+  return original ? { ...original, ...(ballPositions[original.id] || {}) } : null;
+}
+
+// ドリブル開始選手に最も近い予定ボールを選び、離れている場合は主ボールへ戻します。
+function findBallForDribble(step, player, ballPositions) {
+  const balls = getStepBalls(step);
+  const nearest = balls.map((ball) => ({ ball, point: ballPositions[ball.id] || ball }))
+    .sort((left, right) => distance(player, left.point) - distance(player, right.point))[0];
+  const associationDistance = getPlayerRadius() + getBallRadius() + 32;
+  return nearest && distance(player, nearest.point) <= associationDistance ? nearest.ball : balls[0];
 }
 
 // 描画点列へ必要な間隔で点を追加します。
@@ -3198,8 +3309,11 @@ function calculateStepStateAfterGroups(step, completedGroupCount) {
     // 選手IDをキーにして位置を保存します。
     players[player.id] = { x: player.x, y: player.y };
   });
-  // STEP開始時のボール位置を複製します。
-  let ball = { ...step.ball };
+  // STEP開始時の全ボール位置をIDごとに複製します。
+  const balls = {};
+  getStepBalls(step).forEach((ball) => {
+    balls[ball.id] = { x: ball.x, y: ball.y };
+  });
   // 再生順ごとの動作グループを取得します。
   const groups = getOrderedActionGroups(step);
   // 適用するグループ数を有効範囲へ収めます。
@@ -3211,7 +3325,7 @@ function calculateStepStateAfterGroups(step, completedGroupCount) {
       // パスの場合はボールをパス終点へ移します。
       if (line.type === "pass") {
         // ボール位置をパス終点へ更新します。
-        ball = { ...line.end };
+        balls[getLineBallId(step, line)] = { ...line.end };
         // 次の線へ進みます。
         return;
       }
@@ -3229,12 +3343,13 @@ function calculateStepStateAfterGroups(step, completedGroupCount) {
       // ドリブルの場合はボールも選手終点へ追従させます。
       if (isDribbleLineType(line.type)) {
         // ボール位置を選手の右上へ更新します。
-        ball = getBallPositionBesidePlayer(end);
+        balls[getLineBallId(step, line)] = getBallPositionBesidePlayer(end);
       }
     });
   });
-  // 選手位置、ボール位置、動作グループを返します。
-  return { players, ball, groups };
+  // 選手位置、全ボール位置、旧機能用の主ボール位置、動作グループを返します。
+  const primaryBallId = getPrimaryBall(step).id;
+  return { players, balls, ball: { ...balls[primaryBallId] }, groups };
 }
 
 // STEP内の再生順を適用した最終配置を計算します。
@@ -3243,8 +3358,8 @@ function calculateStepEndState(step) {
   const groups = getOrderedActionGroups(step);
   // 全グループ適用後の配置を計算します。
   const finalState = calculateStepStateAfterGroups(step, groups.length);
-  // 選手、ボール、再生対象有無を返します。
-  return { players: finalState.players, ball: finalState.ball, hasAnimation: groups.length > 0 };
+  // 選手、全ボール、旧機能用の主ボール、再生対象有無を返します。
+  return { players: finalState.players, balls: finalState.balls, ball: finalState.ball, hasAnimation: groups.length > 0 };
 }
 
 // 現在位置から戦術線へ自然につながる再生軌道を作ります。
@@ -3458,10 +3573,16 @@ function handlePointerDown(event) {
   const player = isMovementLineType(state.activeTool) ? findPlayerAt(rawPoint) : null;
   // 現在STEPを取得します。
   const drawingStep = getActiveStep();
-  // 既存の描画順を反映したボール予定位置を取得します。
-  const plannedBall = state.activeTool === "pass" ? calculateStepEndState(drawingStep).ball : null;
-  // STEP内にドリブルまたはパスが既にあるか確認します。
-  const hasPreviousBallAction = state.activeTool === "pass" && drawingStep.lines.some((line) => isBallSequenceLineType(line.type));
+  // 既存の描画順を反映した選手・ボール予定位置を取得します。
+  const plannedState = (state.activeTool === "pass" || isDribbleLineType(state.activeTool)) ? calculateStepEndState(drawingStep) : null;
+  // パスは押したボールを、ドリブルは開始選手に最も近いボールを対象にします。
+  const selectedPassBall = state.activeTool === "pass" ? findPlannedBallAt(rawPoint, drawingStep, plannedState.balls) : null;
+  const selectedBall = selectedPassBall
+    || (isDribbleLineType(state.activeTool) && player ? findBallForDribble(drawingStep, player, plannedState.balls) : null)
+    || (state.activeTool === "pass" ? getPrimaryBall(drawingStep) : null);
+  const plannedBall = selectedBall ? plannedState.balls[selectedBall.id] || selectedBall : null;
+  // 対象ボールに以前の動作があるか確認します。
+  const hasPreviousBallAction = Boolean(selectedBall && drawingStep.lines.some((line) => isBallSequenceLineType(line.type) && getLineBallId(drawingStep, line) === selectedBall.id));
   // パスは必ず直前動作後のボール位置から開始し、それ以外は選手または押下位置を使います。
   const startPoint = player ? { x: player.x, y: player.y } : plannedBall ? { ...plannedBall } : rawPoint;
   // 描画ツールの場合は描画操作を開始します。
@@ -3477,7 +3598,9 @@ function handlePointerDown(event) {
     // 曲線用の点列を初期化します。
     points: [{ ...startPoint }],
     // 開始位置にいる選手IDを保存します。
-    playerId: player?.id ?? null
+    playerId: player?.id ?? null,
+    // 複数ボール時もパス・ドリブルの対象を一意に保持します。
+    ballId: selectedBall?.id ?? null
   };
   // 選手に結び付かない移動線の場合は操作方法を案内します。
   if (isMovementLineType(state.activeTool) && !player) {
@@ -3487,7 +3610,7 @@ function handlePointerDown(event) {
   // 直前にドリブルやパスがある場合は、パス始点を自動連結したことを案内します。
   if (hasPreviousBallAction) {
     // 利用者へ自動連結を通知します。
-    showToast("パス始点を直前動作後のボール位置へ自動でつなぎました");
+    showToast(`ボール${selectedBall?.label || "1"}の直前動作後から自動でつなぎました`);
   }
   // プレビューを描画します。
   render();
@@ -3624,10 +3747,14 @@ function handlePointerMove(event) {
     if (dragSession.target.type === "ball") {
       // ボールをコート内へ収めます。
       const next = clampPoint(point, getBallRadius() + 4);
-      // X位置を更新します。
-      step.ball.x = next.x;
-      // Y位置を更新します。
-      step.ball.y = next.y;
+      const ball = getStepBalls(step).find((item) => item.id === dragSession.target.id);
+      if (ball) {
+        // 対象IDのボール位置だけを更新します。
+        ball.x = next.x;
+        ball.y = next.y;
+        // 主ボールの旧形式参照も同じオブジェクトに同期します。
+        step.ball = getPrimaryBall(step);
+      }
     }
     // 移動済みとして記録します。
     dragSession.moved = true;
@@ -3709,6 +3836,8 @@ function handlePointerUp(event) {
         points,
         // 移動対象の選手IDを保存します。
         playerId: drawSession.playerId,
+        // パス・ドリブルの対象ボールIDを保存します。
+        ballId: drawSession.ballId,
         // 描画時に選択していた色を保存します。
         color: state.activeLineColor,
         // 初期再生順は追加後に線種と対象選手から自動設定します。
@@ -4045,10 +4174,12 @@ function changeCourtMode(mode) {
         // Y位置を変換します。
         player.y *= scaleY;
       });
-      // ボールX位置を変換します。
-      step.ball.x *= scaleX;
-      // ボールY位置を変換します。
-      step.ball.y *= scaleY;
+      // 全ボール位置を変換します。
+      getStepBalls(step).forEach((ball) => {
+        ball.x *= scaleX;
+        ball.y *= scaleY;
+      });
+      step.ball = getPrimaryBall(step);
       // 全コーン位置を拡大縮小します。
       step.cones.forEach((cone) => {
         // コーンX位置を変換します。
@@ -4157,7 +4288,8 @@ function rotateCourtAndPlay() {
     const rotatedPoints = new Set();
     state.steps.forEach((step) => {
       (step.players ?? []).forEach((player) => rotatePointClockwise(player, oldSize, rotatedPoints));
-      rotatePointClockwise(step.ball, oldSize, rotatedPoints);
+      getStepBalls(step).forEach((ball) => rotatePointClockwise(ball, oldSize, rotatedPoints));
+      step.ball = getPrimaryBall(step);
       (step.cones ?? []).forEach((cone) => rotatePointClockwise(cone, oldSize, rotatedPoints));
       (step.lines ?? []).forEach((line) => {
         rotatePointClockwise(line.start, oldSize, rotatedPoints);
@@ -4293,6 +4425,56 @@ function adjustPlayerCount(side, change) {
   togglePlayerNumber(side, target.label);
 }
 
+// 新しいボールの初期位置を返します。
+function getDefaultBallPosition(index) {
+  const size = getBaseCourtSize();
+  const column = index % 4;
+  const row = Math.floor(index / 4);
+  const point = orientNewPointForCourt({
+    x: size.width * (0.48 + column * 0.055),
+    y: size.height * (0.82 - row * 0.07)
+  }, size);
+  return clampPoint(point, getBallRadius() + 6);
+}
+
+// 現在STEPのボールを1個ずつ増減します。主ボールは互換性のため必ず残します。
+function adjustBallCount(change) {
+  clearPlaybackPreview();
+  const step = getActiveStep();
+  const balls = getStepBalls(step);
+  if (change > 0) {
+    if (balls.length >= 9) {
+      showToast("ボールは最大9個まで追加できます");
+      return;
+    }
+    const position = getDefaultBallPosition(balls.length);
+    commitMutation(() => {
+      const currentBalls = getStepBalls(step);
+      currentBalls.push({
+        id: makeId("ball"),
+        label: String(currentBalls.length + 1),
+        x: position.x,
+        y: position.y
+      });
+      step.ball = currentBalls[0];
+    });
+    showToast(`ボール${getStepBalls(step).length}を追加しました`);
+    return;
+  }
+  if (balls.length <= 1) {
+    showToast("ボールは最低1個必要です");
+    return;
+  }
+  const target = balls[balls.length - 1];
+  commitMutation(() => {
+    step.balls = getStepBalls(step).filter((ball) => ball.id !== target.id);
+    // 削除ボールに結び付くパス・ドリブルだけを同時に削除します。
+    step.lines = step.lines.filter((line) => !isBallSequenceLineType(line.type) || line.ballId !== target.id);
+    step.ball = step.balls[0];
+  });
+  showToast(`ボール${target.label}を削除しました`);
+}
+
 // 全番号選択欄を必要な時だけ開閉します。
 function setPlayerNumberDetailsVisible(visible) {
   playerNumberDetailsVisible = Boolean(visible);
@@ -4338,6 +4520,7 @@ function renderPlayerNumberGrids() {
   // 通常表示する簡易人数へ現在STEPの人数を反映します。
   offensePlayerCount.textContent = String(step.players.filter((player) => player.side === "offense").length);
   defensePlayerCount.textContent = String(step.players.filter((player) => player.side === "defense").length);
+  if (ballCount) ballCount.textContent = String(getStepBalls(step).length);
   // 全番号欄の開閉状態を維持します。
   setPlayerNumberDetailsVisible(playerNumberDetailsVisible);
 }
@@ -4418,10 +4601,16 @@ function renderActionOrderList() {
     const label = document.createElement("span");
     // 対象選手を探します。
     const player = line.playerId ? step.players.find((item) => item.id === line.playerId) : null;
+    const actionBall = isBallSequenceLineType(line.type) ? getStepBalls(step).find((ball) => ball.id === getLineBallId(step, line)) : null;
     // 攻守を短い文字へ変換します。
     const sideLabel = player ? (player.side === "offense" ? "O" : "D") : "";
     // 対象名を作ります。
-    const targetLabel = line.type === "pass" ? "ボール" : player ? `${sideLabel}${player.label}` : "説明線";
+    const ballSuffix = getStepBalls(step).length > 1 && actionBall ? actionBall.label : "";
+    const targetLabel = line.type === "pass"
+      ? `ボール${ballSuffix}`
+      : player
+        ? `${sideLabel}${player.label}${isDribbleLineType(line.type) && ballSuffix ? `・ボール${ballSuffix}` : ""}`
+        : "説明線";
     // 描画順、動作種別、対象を表示します。
     label.textContent = `${actionIndex + 1}. ${getActionTypeLabel(line.type)}・${targetLabel}`;
     // 情報領域へ色を追加します。
@@ -4641,8 +4830,15 @@ function addStep() {
         player.y = end.y;
       }
     });
-    // パスとドリブルを描画順に適用したボール最終位置を反映します。
-    duplicated.ball = { ...endState.ball };
+    // 各ボールのパス・ドリブル後の最終位置を次STEPへ反映します。
+    getStepBalls(duplicated).forEach((ball) => {
+      const end = endState.balls[ball.id];
+      if (end) {
+        ball.x = end.x;
+        ball.y = end.y;
+      }
+    });
+    duplicated.ball = getPrimaryBall(duplicated);
     // 次の動作を描けるように前STEPの線は引き継ぎません。
     duplicated.lines = [];
     // 次STEPのコーチングポイントは空にします。
@@ -4686,14 +4882,19 @@ function deleteStep() {
 async function animateActionGroup(group, step, playerPositions, ballState, runId) {
   // 同じ番号で同時に動かす選手移動とスクリーンを抽出します。
   const parallelPlayerActions = group.items.map(({ line }) => line).filter((line) => isMovementLineType(line.type) && !isDribbleLineType(line.type));
-  // ボールを扱うパスとドリブルを描画順で抽出します。
-  const ballSequenceActions = group.items.map(({ line }) => line).filter((line) => isBallSequenceLineType(line.type));
+  // ボールを扱うパスとドリブルをボールIDごとの描画順へ分けます。
+  const ballSequenceGroups = new Map();
+  group.items.map(({ line }) => line).filter((line) => isBallSequenceLineType(line.type)).forEach((line) => {
+    const ballId = getLineBallId(step, line);
+    if (!ballSequenceGroups.has(ballId)) ballSequenceGroups.set(ballId, []);
+    ballSequenceGroups.get(ballId).push(line);
+  });
   // 選手動作とボール動作列を同時に開始します。
   await Promise.all([
     // 移動とスクリーンを同時再生します。
     animateParallelPlayerActions(parallelPlayerActions, step, playerPositions, ballState, runId),
-    // パスとドリブルは同じ番号内でも描画順を守ります。
-    animateBallSequenceActions(ballSequenceActions, step, playerPositions, ballState, runId)
+    // 同じボールの動作順は守り、別ボールは同時再生できます。
+    ...[...ballSequenceGroups.entries()].map(([ballId, lines]) => animateBallSequenceActions(lines, ballId, step, playerPositions, ballState, runId))
   ]);
 }
 
@@ -4708,7 +4909,7 @@ function initializeFramePlayback() {
   // コマ送り位置を開始へ設定します。
   framePlayback = { stepIndex, completedGroups: 0 };
   // 開始配置を再生表示へ反映します。
-  updatePlaybackVisual(step, startState.players, startState.ball);
+  updatePlaybackVisual(step, startState.players, startState.balls);
   // 開始位置を描画します。
   render();
 }
@@ -4747,7 +4948,7 @@ async function stepPlaybackForward() {
     // 次STEPの開始配置を計算します。
     const nextState = calculateStepStateAfterGroups(nextStep, 0);
     // 次STEPの開始配置を表示します。
-    updatePlaybackVisual(nextStep, nextState.players, nextState.ball);
+    updatePlaybackVisual(nextStep, nextState.players, nextState.balls);
     // 画面を同期します。
     syncInterface(false);
     // STEP移動を通知します。
@@ -4760,7 +4961,7 @@ async function stepPlaybackForward() {
   // 選手位置を複製します。
   const playerPositions = clonePlayerPositionMap(currentState.players);
   // ボール位置を保持します。
-  const ballState = { position: { ...currentState.ball } };
+  const ballState = { positions: clonePlayerPositionMap(currentState.balls) };
   // 新しい再生番号を発行します。
   playbackRunId += 1;
   // 今回の再生番号を保持します。
@@ -4770,7 +4971,7 @@ async function stepPlaybackForward() {
   // 再生ボタン表示を停止へ変更します。
   updatePlayButtonLabels("■ 停止");
   // 現在配置を表示します。
-  updatePlaybackVisual(step, playerPositions, ballState.position);
+  updatePlaybackVisual(step, playerPositions, ballState.positions);
   // 次の一動作グループだけを再生します。
   await animateActionGroup(groups[framePlayback.completedGroups], step, playerPositions, ballState, runId);
   // 停止されず完了した場合を処理します。
@@ -4818,7 +5019,7 @@ function stepPlaybackBackward() {
   // 対応する配置を計算します。
   const frameState = calculateStepStateAfterGroups(step, framePlayback.completedGroups);
   // 一つ前の配置を表示します。
-  updatePlaybackVisual(step, frameState.players, frameState.ball);
+  updatePlaybackVisual(step, frameState.players, frameState.balls);
   // 画面を同期します。
   syncInterface(false);
 }
@@ -4918,10 +5119,13 @@ async function animateStepAlongLines(step, runId) {
     // 選手IDごとの位置を複製します。
     playerPositions[player.id] = { x: player.x, y: player.y };
   });
-  // STEP開始時のボール位置を保持します。
-  const ballState = { position: { ...step.ball } };
+  // STEP開始時の全ボール位置をIDごとに保持します。
+  const ballState = { positions: {} };
+  getStepBalls(step).forEach((ball) => {
+    ballState.positions[ball.id] = { x: ball.x, y: ball.y };
+  });
   // 開始位置を再生表示へ反映します。
-  updatePlaybackVisual(step, playerPositions, ballState.position);
+  updatePlaybackVisual(step, playerPositions, ballState.positions);
   // Canvasを再描画します。
   render();
   // 再生順の小さいグループから実行します。
@@ -4942,16 +5146,18 @@ async function animateStepAlongLines(step, runId) {
   // 停止されていない場合は最終位置を表示へ確定します。
   if (playbackTimer === runId) {
     // 最終選手位置とボール位置を保持します。
-    updatePlaybackVisual(step, playerPositions, ballState.position);
+    updatePlaybackVisual(step, playerPositions, ballState.positions);
     // 最終状態を描画します。
     render();
   }
 }
 
 // 再生用の選手とボール位置を一括更新します。
-function updatePlaybackVisual(step, playerPositions, ballPosition) {
-  // 現在STEPの表示位置を深く複製して保存します。
-  playbackVisual = { stepId: step.id, players: clonePlayerPositionMap(playerPositions), ball: { ...ballPosition } };
+function updatePlaybackVisual(step, playerPositions, ballPositions) {
+  // 現在STEPの表示位置を深く複製して保存します。ballは旧内部参照用に主ボールも残します。
+  const balls = clonePlayerPositionMap(ballPositions);
+  const primaryBallId = getPrimaryBall(step).id;
+  playbackVisual = { stepId: step.id, players: clonePlayerPositionMap(playerPositions), balls, ball: { ...(balls[primaryBallId] || {}) } };
 }
 
 // 同じ再生順の移動とスクリーンを同時に再生します。
@@ -4979,7 +5185,7 @@ async function animateParallelPlayerActions(lines, step, playerPositions, ballSt
       // 対象選手の現在位置を更新します。
       playerPositions[line.playerId] = { ...point };
       // 全選手とボールの最新位置を表示へ反映します。
-      updatePlaybackVisual(step, playerPositions, ballState.position);
+      updatePlaybackVisual(step, playerPositions, ballState.positions);
     });
     // 停止されていない場合は終点を確定します。
     if (playbackTimer === runId) {
@@ -4988,13 +5194,13 @@ async function animateParallelPlayerActions(lines, step, playerPositions, ballSt
       // 選手最終位置を保存します。
       playerPositions[line.playerId] = { ...end };
       // 最新位置を表示へ反映します。
-      updatePlaybackVisual(step, playerPositions, ballState.position);
+      updatePlaybackVisual(step, playerPositions, ballState.positions);
     }
   }));
 }
 
 // 同じSTEPのパスとドリブルを描画順に再生します。
-async function animateBallSequenceActions(lines, step, playerPositions, ballState, runId) {
+async function animateBallSequenceActions(lines, ballId, step, playerPositions, ballState, runId) {
   // 描画順にボール動作を一つずつ処理します。
   for (const line of lines) {
     // 停止された場合は処理を終了します。
@@ -5005,20 +5211,20 @@ async function animateBallSequenceActions(lines, step, playerPositions, ballStat
     // パス線の場合を処理します。
     if (line.type === "pass") {
       // 現在のボール位置からパス終点への直線軌道を作ります。
-      const path = buildActionPath(ballState.position, line);
+      const path = buildActionPath(ballState.positions[ballId], line);
       // 軌道長に応じたパス時間を計算します。
       const duration = calculateActionDuration(line, path);
       // ボールを直線に沿って移動させます。
       await animateSingleAction(path, duration, runId, (point) => {
         // ボール位置を現在フレームへ更新します。
-        ballState.position = { ...point };
+        ballState.positions[ballId] = { ...point };
         // 選手位置を保持したままボール表示を更新します。
-        updatePlaybackVisual(step, playerPositions, ballState.position);
+        updatePlaybackVisual(step, playerPositions, ballState.positions);
       });
       // 停止されていない場合はパス終点を確定します。
       if (playbackTimer === runId) {
         // ボール最終位置を線の終点へ固定します。
-        ballState.position = { ...line.end };
+        ballState.positions[ballId] = { ...line.end };
       }
     } else {
       // ドリブル対象選手の現在位置を取得します。
@@ -5033,7 +5239,7 @@ async function animateBallSequenceActions(lines, step, playerPositions, ballStat
       // 軌道長に応じたドリブル時間を計算します。
       const duration = calculateActionDuration(line, path);
       // ドリブル開始時のボール位置を保持します。
-      const actionBallStart = { ...ballState.position };
+      const actionBallStart = { ...ballState.positions[ballId] };
       // 選手とボールを軌道に沿って移動させます。
       await animateSingleAction(path, duration, runId, (point, progress) => {
         // 対象選手の現在位置を更新します。
@@ -5041,9 +5247,9 @@ async function animateBallSequenceActions(lines, step, playerPositions, ballStat
         // 選手横の目標ボール位置を計算します。
         const targetBall = getBallPositionBesidePlayer(point);
         // 開始位置から滑らかにボールをつなぎます。
-        ballState.position = interpolatePoint(actionBallStart, targetBall, progress);
+        ballState.positions[ballId] = interpolatePoint(actionBallStart, targetBall, progress);
         // 全選手とボールの最新位置を表示へ反映します。
-        updatePlaybackVisual(step, playerPositions, ballState.position);
+        updatePlaybackVisual(step, playerPositions, ballState.positions);
       });
       // 停止されていない場合は選手とボールの終点を確定します。
       if (playbackTimer === runId) {
@@ -5052,7 +5258,7 @@ async function animateBallSequenceActions(lines, step, playerPositions, ballStat
         // 選手最終位置を保存します。
         playerPositions[line.playerId] = { ...end };
         // ボールを選手終点の右上へ配置します。
-        ballState.position = getBallPositionBesidePlayer(end);
+        ballState.positions[ballId] = getBallPositionBesidePlayer(end);
       }
     }
     // ボール動作の間に短い間を入れます。
@@ -6790,6 +6996,11 @@ document.querySelectorAll("[data-player-count-change]").forEach((button) => {
   button.addEventListener("click", () => {
     adjustPlayerCount(button.dataset.playerCountSide, Number(button.dataset.playerCountChange));
   });
+});
+
+// ボール数の増減ボタンへイベントを登録します。
+document.querySelectorAll("[data-ball-count-change]").forEach((button) => {
+  button.addEventListener("click", () => adjustBallCount(Number(button.dataset.ballCountChange)));
 });
 
 // 全番号選択欄の開閉ボタンを登録します。

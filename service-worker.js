@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v42-brand-refresh";
+const CACHE_NAME = "zeroone-canvas-v43-multi-ball";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
