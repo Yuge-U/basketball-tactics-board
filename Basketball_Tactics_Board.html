@@ -20,7 +20,7 @@
   <!-- iPadのホーム画面に表示するアイコンです。 -->
   <link rel="apple-touch-icon" href="./1_App/img/coach_icon_192.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=42" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=43" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
 </head>
@@ -413,6 +413,14 @@
               <button type="button" data-player-count-side="defense" data-player-count-change="-1" title="ディフェンスを1人削除">−</button>
             </div>
           </div>
+          <div class="player-count-row ball">
+            <span class="player-count-label">ボール</span>
+            <div class="player-count-control" role="group" aria-label="ボール数">
+              <button type="button" data-ball-count-change="1" title="ボールを1個追加">＋</button>
+              <output id="ballCount">1</output>
+              <button type="button" data-ball-count-change="-1" title="ボールを1個削除">−</button>
+            </div>
+          </div>
           <div id="playerNumberDetails" class="player-number-details hidden">
             <div class="player-number-section offense">
               <span class="player-number-title">オフェンス 0〜18</span>
@@ -726,6 +734,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=41"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=42"></script>
+  <script defer src="./1_App/js/app.js?v=43"></script>
 </body>
 </html>

@@ -1252,6 +1252,10 @@ body.board-focus .canvas-hint {
   color: #b91c1c;
 }
 
+.player-count-row.ball .player-count-control button {
+  color: #c2410c;
+}
+
 .player-count-control output {
   display: grid;
   place-items: center;
