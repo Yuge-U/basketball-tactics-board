@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v44-library-prefetch";
+const CACHE_NAME = "zeroone-canvas-v45-new-icon";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
@@ -14,9 +14,10 @@ const APP_FILES = [
   "./1_App/js/onedrive-storage.js",
   "./1_App/js/folder-access.js",
   "./1_App/js/app.js",
-  "./1_App/img/coach_icon.png",
-  "./1_App/img/coach_icon_192.png",
-  "./1_App/img/coach_icon_512.png"
+  "./1_App/img/zeroone_icon.png",
+  "./1_App/img/zeroone_icon_180.png",
+  "./1_App/img/zeroone_icon_192.png",
+  "./1_App/img/zeroone_icon_512.png"
 ];
 
 // 初回公開時にアプリファイルを端末へ保存します。
