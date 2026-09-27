@@ -556,6 +556,9 @@ const defenseNumberGrid = document.getElementById("defenseNumberGrid");
 const offensePlayerCount = document.getElementById("offensePlayerCount");
 const defensePlayerCount = document.getElementById("defensePlayerCount");
 const ballCount = document.getElementById("ballCount");
+const focusOffensePlayerCount = document.getElementById("focusOffensePlayerCount");
+const focusDefensePlayerCount = document.getElementById("focusDefensePlayerCount");
+const focusBallCount = document.getElementById("focusBallCount");
 // 全番号の開閉要素を取得します。
 const playerNumberDetails = document.getElementById("playerNumberDetails");
 const playerNumberDetailsToggle = document.getElementById("playerNumberDetailsToggle");
@@ -4529,9 +4532,15 @@ function renderPlayerNumberGrids() {
     }
   });
   // 通常表示する簡易人数へ現在STEPの人数を反映します。
-  offensePlayerCount.textContent = String(step.players.filter((player) => player.side === "offense").length);
-  defensePlayerCount.textContent = String(step.players.filter((player) => player.side === "defense").length);
-  if (ballCount) ballCount.textContent = String(getStepBalls(step).length);
+  const offenseCount = String(step.players.filter((player) => player.side === "offense").length);
+  const defenseCount = String(step.players.filter((player) => player.side === "defense").length);
+  const currentBallCount = String(getStepBalls(step).length);
+  offensePlayerCount.textContent = offenseCount;
+  defensePlayerCount.textContent = defenseCount;
+  if (ballCount) ballCount.textContent = currentBallCount;
+  if (focusOffensePlayerCount) focusOffensePlayerCount.textContent = offenseCount;
+  if (focusDefensePlayerCount) focusDefensePlayerCount.textContent = defenseCount;
+  if (focusBallCount) focusBallCount.textContent = currentBallCount;
   // 全番号欄の開閉状態を維持します。
   setPlayerNumberDetailsVisible(playerNumberDetailsVisible);
 }
@@ -7014,10 +7023,12 @@ function syncInterface(save = true) {
   if (playNameInput.value !== state.playName && document.activeElement !== playNameInput) {
     playNameInput.value = state.playName;
   }
-  // 半面ボタン状態を同期します。
-  document.getElementById("halfCourtButton").classList.toggle("active", state.courtMode === "half");
-  // 全面ボタン状態を同期します。
-  document.getElementById("fullCourtButton").classList.toggle("active", state.courtMode === "full");
+  // 通常画面と最大表示設定のコート切替ボタンを同期します。
+  document.querySelectorAll("[data-court-mode]").forEach((button) => {
+    const active = button.dataset.courtMode === state.courtMode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
   // 通常表示と最大表示の回転ボタンへ現在方向を同期します。
   [rotateCourtButton, focusRotateCourtButton].forEach((button) => {
     if (!button) return;
@@ -7254,10 +7265,10 @@ window.addEventListener("resize", resizeCanvas);
 // キーボード操作を登録します。
 window.addEventListener("keydown", handleKeyDown);
 
-// 半面切替ボタンを登録します。
-document.getElementById("halfCourtButton").addEventListener("click", () => changeCourtMode("half"));
-// 全面切替ボタンを登録します。
-document.getElementById("fullCourtButton").addEventListener("click", () => changeCourtMode("full"));
+// 通常画面と最大表示設定のコート切替ボタンを登録します。
+document.querySelectorAll("[data-court-mode]").forEach((button) => {
+  button.addEventListener("click", () => changeCourtMode(button.dataset.courtMode));
+});
 // 元に戻すボタンを登録します。
 document.getElementById("undoButton").addEventListener("click", undo);
 // やり直しボタンを登録します。

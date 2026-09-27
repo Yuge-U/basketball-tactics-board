@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v47-step-dock";
+const CACHE_NAME = "zeroone-canvas-v48-focus-settings";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
