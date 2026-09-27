@@ -527,6 +527,7 @@ const focusControls = document.getElementById("focusControls");
 const focusPlayButton = document.getElementById("focusPlayButton");
 // 最大表示用のSTEP一覧を取得します。
 const focusStepList = document.getElementById("focusStepList");
+const focusStepDock = document.getElementById("focusStepDock");
 // 最大表示中のSTEP一覧表示切替を取得します。
 const focusStepsVisibilityButton = document.getElementById("focusStepsVisibilityButton");
 // 最大表示中の編集パネルを取得します。
@@ -4033,7 +4034,7 @@ function updatePlayButtonLabels(label) {
 // 最大表示中のSTEP一覧の表示状態を同期します。再生ボタンは常時表示します。
 function syncFocusVisibility() {
   focusPlayButton.classList.remove("hidden");
-  focusStepList.classList.toggle("hidden", !state.focusShowSteps);
+  focusStepDock?.classList.toggle("hidden", !state.focusShowSteps);
   focusStepsVisibilityButton.classList.toggle("active", state.focusShowSteps);
   focusStepsVisibilityButton.setAttribute("aria-pressed", String(state.focusShowSteps));
   const hint = state.focusShowSteps ? "STEP一覧を隠す" : "STEP一覧を表示";

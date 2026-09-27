@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" href="./1_App/img/zeroone_icon.png" />
   <link rel="apple-touch-icon" href="./1_App/img/zeroone_icon_180.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=45" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=46" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
 </head>
@@ -218,9 +218,6 @@
             <button id="focusPlayButton" class="focus-button primary" type="button" aria-label="再生" title="再生">▶</button>
             <!-- 次の動作またはSTEPへ進みます。 -->
             <button id="focusNextFrameButton" class="focus-button" type="button" aria-label="次へ" title="次へ">⏭</button>
-            <button id="focusDuplicateStepButton" class="focus-button" type="button" aria-label="現在のSTEPを複製" title="現在のSTEPを複製">⧉</button>
-            <button id="focusMoveStepBackwardButton" class="focus-button" type="button" aria-label="STEPを前へ移動" title="STEPを前へ移動">←</button>
-            <button id="focusMoveStepForwardButton" class="focus-button" type="button" aria-label="STEPを次へ移動" title="STEPを次へ移動">→</button>
           </div>
           <!-- 最大表示中のSTEP一覧を薄いアイコンで開閉します。 -->
           <div class="focus-visibility-controls" aria-label="最大表示中の表示切替">
@@ -228,7 +225,14 @@
             <button id="focusPlaybackSettingsButton" class="focus-visibility-button" type="button" aria-pressed="false" aria-label="再生設定を表示" title="再生設定を表示">⚙</button>
           </div>
           <!-- 最大表示中のSTEP一覧です。 -->
-          <div id="focusStepList" class="focus-step-list" aria-label="最大表示中の作戦ステップ"></div>
+          <div id="focusStepDock" class="focus-step-dock hidden" aria-label="STEP一覧と操作">
+            <div id="focusStepList" class="focus-step-list" aria-label="最大表示中の作戦ステップ"></div>
+            <div class="focus-step-actions" aria-label="STEP操作">
+              <button id="focusDuplicateStepButton" class="focus-button" type="button" aria-label="現在のSTEPを複製" title="現在のSTEPを複製">⧉</button>
+              <button id="focusMoveStepBackwardButton" class="focus-button" type="button" aria-label="STEPを前へ移動" title="STEPを前へ移動">←</button>
+              <button id="focusMoveStepForwardButton" class="focus-button" type="button" aria-label="STEPを次へ移動" title="STEPを次へ移動">→</button>
+            </div>
+          </div>
           <!-- 最大表示中の動作順・速度・移動線設定です。 -->
           <div id="focusPlaybackSettingsPanel" class="focus-playback-settings-panel" aria-label="最大表示中の再生設定">
             <div class="focus-settings-heading">
@@ -740,6 +744,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=44"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=45"></script>
+  <script defer src="./1_App/js/app.js?v=46"></script>
 </body>
 </html>
