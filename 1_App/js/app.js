@@ -552,6 +552,8 @@ const focusRedoButton = document.getElementById("focusRedoButton");
 const offenseNumberGrid = document.getElementById("offenseNumberGrid");
 // ディフェンス番号ボタンの配置先を取得します。
 const defenseNumberGrid = document.getElementById("defenseNumberGrid");
+const focusOffenseNumberGrid = document.getElementById("focusOffenseNumberGrid");
+const focusDefenseNumberGrid = document.getElementById("focusDefenseNumberGrid");
 // 選手人数の表示欄を取得します。
 const offensePlayerCount = document.getElementById("offensePlayerCount");
 const defensePlayerCount = document.getElementById("defensePlayerCount");
@@ -563,6 +565,7 @@ const focusBallCount = document.getElementById("focusBallCount");
 const playerNumberDetails = document.getElementById("playerNumberDetails");
 const playerNumberDetailsToggle = document.getElementById("playerNumberDetailsToggle");
 const focusPlayerNumberDetailsToggle = document.getElementById("focusPlayerNumberDetailsToggle");
+const focusPlayerNumberDetails = document.getElementById("focusPlayerNumberDetails");
 // 現在STEPの動作順一覧を取得します。
 const actionOrderList = document.getElementById("actionOrderList");
 // 動作順を初期値へ戻すボタンを取得します。
@@ -4494,6 +4497,7 @@ function adjustBallCount(change) {
 function setPlayerNumberDetailsVisible(visible) {
   playerNumberDetailsVisible = Boolean(visible);
   playerNumberDetails.classList.toggle("hidden", !playerNumberDetailsVisible);
+  focusPlayerNumberDetails?.classList.toggle("hidden", !playerNumberDetailsVisible);
   const hint = playerNumberDetailsVisible ? "全番号を閉じる" : "全番号を表示";
   [playerNumberDetailsToggle, focusPlayerNumberDetailsToggle].forEach((toggle) => {
     if (!toggle) return;
@@ -4510,7 +4514,8 @@ function renderPlayerNumberGrids() {
   // 現在STEPを取得します。
   const step = getActiveStep();
   // 側ごとの番号グリッドを処理します。
-  [["offense", offenseNumberGrid], ["defense", defenseNumberGrid]].forEach(([side, grid]) => {
+  [["offense", offenseNumberGrid], ["defense", defenseNumberGrid], ["offense", focusOffenseNumberGrid], ["defense", focusDefenseNumberGrid]].forEach(([side, grid]) => {
+    if (!grid) return;
     // 既存ボタンを消します。
     grid.innerHTML = "";
     // 0番から18番までボタンを作ります。
