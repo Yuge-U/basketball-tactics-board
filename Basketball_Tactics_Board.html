@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" href="./1_App/img/zeroone_icon.png" />
   <link rel="apple-touch-icon" href="./1_App/img/zeroone_icon_180.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=46" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=47" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
 </head>
@@ -180,10 +180,10 @@
         <div class="board-controls">
           <!-- コート表示を切り替えます。 -->
           <div class="segmented" role="group" aria-label="コート表示">
-            <button id="halfCourtButton" class="segment court-mode-button active" type="button" aria-label="ハーフコート" title="ハーフコート">
+            <button id="halfCourtButton" class="segment court-mode-button active" type="button" data-court-mode="half" aria-label="ハーフコート" title="ハーフコート">
               <svg viewBox="0 0 34 24" aria-hidden="true"><rect x="1.5" y="1.5" width="31" height="21" rx="2"></rect><line x1="1.5" y1="6.5" x2="32.5" y2="6.5"></line><path d="M11 6.5a6 6 0 0 0 12 0"></path><circle cx="17" cy="4.7" r="1.2"></circle></svg>
             </button>
-            <button id="fullCourtButton" class="segment court-mode-button" type="button" aria-label="フルコート" title="フルコート">
+            <button id="fullCourtButton" class="segment court-mode-button" type="button" data-court-mode="full" aria-label="フルコート" title="フルコート">
               <svg viewBox="0 0 34 24" aria-hidden="true"><rect x="1.5" y="1.5" width="31" height="21" rx="2"></rect><line x1="17" y1="1.5" x2="17" y2="22.5"></line><circle cx="17" cy="12" r="4"></circle><path d="M1.5 7a7 7 0 0 1 0 10M32.5 7a7 7 0 0 0 0 10"></path></svg>
             </button>
           </div>
@@ -238,6 +238,10 @@
             <div class="focus-settings-heading">
               <strong>再生設定</strong>
               <button id="focusResetActionOrderButton" class="focus-mini-button" type="button" aria-label="動作順を初期値へ戻す" title="動作順を初期値へ戻す">↺</button>
+            </div>
+            <div class="focus-court-mode-controls" role="group" aria-label="コート表示">
+              <button class="focus-court-mode-button" type="button" data-court-mode="half" aria-label="ハーフコート" aria-pressed="false">ハーフ</button>
+              <button class="focus-court-mode-button" type="button" data-court-mode="full" aria-label="オールコート" aria-pressed="false">オールコート</button>
             </div>
             <div class="focus-speed-setting">
               <label for="focusMovementSpeedRange"><span>移動速度</span><output id="focusMovementSpeedValue">1.00×</output></label>
@@ -310,6 +314,35 @@
               <button type="button" data-ball-size="large" title="ボールサイズ 大">大</button>
               <button class="active" type="button" data-ball-size="medium" title="ボールサイズ 中">中</button>
               <button type="button" data-ball-size="small" title="ボールサイズ 小">小</button>
+            </div>
+            <details class="focus-player-count-details">
+              <summary>選手数</summary>
+              <div class="focus-player-count-list">
+                <div class="focus-count-row offense">
+                  <span>オフェンス</span>
+                  <div class="focus-count-control" role="group" aria-label="オフェンス人数">
+                    <button type="button" data-player-count-side="offense" data-player-count-change="1" title="オフェンスを1人追加">＋</button>
+                    <output id="focusOffensePlayerCount">0</output>
+                    <button type="button" data-player-count-side="offense" data-player-count-change="-1" title="オフェンスを1人削除">−</button>
+                  </div>
+                </div>
+                <div class="focus-count-row defense">
+                  <span>ディフェンス</span>
+                  <div class="focus-count-control" role="group" aria-label="ディフェンス人数">
+                    <button type="button" data-player-count-side="defense" data-player-count-change="1" title="ディフェンスを1人追加">＋</button>
+                    <output id="focusDefensePlayerCount">0</output>
+                    <button type="button" data-player-count-side="defense" data-player-count-change="-1" title="ディフェンスを1人削除">−</button>
+                  </div>
+                </div>
+              </div>
+            </details>
+            <div class="focus-count-row ball">
+              <span>ボール数</span>
+              <div class="focus-count-control" role="group" aria-label="ボール数">
+                <button type="button" data-ball-count-change="1" title="ボールを1個追加">＋</button>
+                <output id="focusBallCount">1</output>
+                <button type="button" data-ball-count-change="-1" title="ボールを1個削除">−</button>
+              </div>
             </div>
           </div>
           <!-- 右下の薄いボタンで最大表示中の編集ツールを開閉します。 -->
@@ -744,6 +777,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=44"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=46"></script>
+  <script defer src="./1_App/js/app.js?v=47"></script>
 </body>
 </html>
