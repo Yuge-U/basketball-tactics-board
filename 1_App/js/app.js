@@ -4623,6 +4623,9 @@ function renderActionOrderList() {
         : "説明線";
     // 描画順、動作種別、対象を表示します。
     label.textContent = `${actionIndex + 1}. ${getActionTypeLabel(line.type)}・${targetLabel}`;
+    // 省略表示された動作名もホバーまたはフォーカスで全文を確認できるようにします。
+    label.title = label.textContent;
+    row.title = label.textContent;
     // 情報領域へ色を追加します。
     info.appendChild(swatch);
     // 情報領域へ文字を追加します。
@@ -4711,6 +4714,8 @@ function renderFocusActionOrderList(actions) {
     const label = document.createElement("span");
     label.className = "action-order-focus-label";
     label.textContent = `${actionIndex + 1}. ${getActionTypeLabel(line.type)}・${targetLabel}`;
+    label.title = label.textContent;
+    row.title = label.textContent;
     const select = document.createElement("select");
     select.className = "action-order-select";
     select.setAttribute("aria-label", `${label.textContent}の再生順`);
@@ -4789,6 +4794,23 @@ function renderStepList() {
     // 一覧へ追加します。
     stepList.appendChild(button);
   });
+  // STEPの位置に応じて前後移動ボタンを有効化します。
+  syncStepMoveButtons();
+}
+
+// 現在STEPを前後へ移動するボタンの状態を更新します。
+function syncStepMoveButtons() {
+  const activeIndex = state.steps.findIndex((step) => step.id === state.activeStepId);
+  const atStart = activeIndex <= 0;
+  const atEnd = activeIndex < 0 || activeIndex >= state.steps.length - 1;
+  ["moveStepBackwardButton", "focusMoveStepBackwardButton"].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) button.disabled = atStart;
+  });
+  ["moveStepForwardButton", "focusMoveStepForwardButton"].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) button.disabled = atEnd;
+  });
 }
 
 // 指定STEPを選択します。
@@ -4808,6 +4830,23 @@ function selectStep(stepId) {
   selectedCanvasItem = null;
   // 画面を同期します。
   syncInterface();
+}
+
+// 選択中STEPを一覧内で前後へ移動します。
+function moveActiveStep(offset) {
+  const currentIndex = state.steps.findIndex((step) => step.id === state.activeStepId);
+  const nextIndex = currentIndex + Math.sign(offset);
+  if (currentIndex < 0 || nextIndex < 0 || nextIndex >= state.steps.length) {
+    return;
+  }
+  if (playbackTimer) stopPlayback(false);
+  framePlayback = null;
+  playbackVisual = null;
+  commitMutation(() => {
+    const [activeStep] = state.steps.splice(currentIndex, 1);
+    state.steps.splice(nextIndex, 0, activeStep);
+  });
+  showToast(`STEPを${nextIndex + 1}番目へ移動しました`);
 }
 
 // 現在STEPの描画順再生後の配置を使って次STEPを追加します。
@@ -7238,6 +7277,11 @@ focusPlayButton.addEventListener("click", playSteps);
 focusPreviousFrameButton.addEventListener("click", stepPlaybackBackward);
 // 最大表示用の次へボタンを登録します。
 focusNextFrameButton.addEventListener("click", stepPlaybackForward);
+// 最大表示中のSTEP複製を登録します。
+document.getElementById("focusDuplicateStepButton")?.addEventListener("click", addStep);
+// 最大表示中のSTEP前後移動を登録します。
+document.getElementById("focusMoveStepBackwardButton")?.addEventListener("click", () => moveActiveStep(-1));
+document.getElementById("focusMoveStepForwardButton")?.addEventListener("click", () => moveActiveStep(1));
 // 最大表示中のSTEP一覧表示切替を登録します。
 focusStepsVisibilityButton.addEventListener("click", () => {
   state.focusShowSteps = !state.focusShowSteps;
@@ -7280,6 +7324,9 @@ focusRedoButton.addEventListener("click", redo);
 document.getElementById("resetButton").addEventListener("click", resetBoard);
 // STEP追加ボタンを登録します。
 document.getElementById("addStepButton").addEventListener("click", addStep);
+// 現在STEPの前後移動を登録します。
+document.getElementById("moveStepBackwardButton")?.addEventListener("click", () => moveActiveStep(-1));
+document.getElementById("moveStepForwardButton")?.addEventListener("click", () => moveActiveStep(1));
 // STEP削除ボタンを登録します。
 document.getElementById("deleteStepButton").addEventListener("click", deleteStep);
 // 一つ前の動作ボタンを登録します。

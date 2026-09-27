@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v45-new-icon";
+const CACHE_NAME = "zeroone-canvas-v46-step-controls";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
