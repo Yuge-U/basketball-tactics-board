@@ -1048,25 +1048,46 @@ button:disabled {
 
 /* 非表示指定を優先します。 */
 .focus-button.hidden,
-.focus-step-list.hidden {
+.focus-step-dock.hidden {
   display: none !important;
 }
 
-/* 最大表示中のSTEP一覧です。 */
-.focus-step-list {
+/* 最大表示中のSTEP一覧と複製・並べ替え操作をまとめます。 */
+.focus-step-dock {
   position: absolute;
   left: 50%;
   bottom: 16px;
   z-index: 12;
   display: none;
-  gap: 7px;
+  align-items: center;
+  gap: 8px;
   max-width: calc(100% - 32px);
-  overflow-x: auto;
-  transform: translateX(-50%);
   padding: 7px;
   border-radius: 14px;
   background: rgba(17, 24, 39, 0.66);
   backdrop-filter: blur(8px);
+  transform: translateX(-50%);
+}
+
+/* STEP番号だけを横スクロールし、操作ボタンは隣に固定します。 */
+.focus-step-list {
+  display: flex;
+  gap: 7px;
+  max-width: calc(100vw - 180px);
+  overflow-x: auto;
+  padding: 0;
+  scrollbar-width: thin;
+}
+
+.focus-step-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+.focus-step-actions .focus-button {
+  width: 34px;
+  height: 34px;
 }
 
 /* 最大表示中のSTEPボタンです。 */
@@ -1173,7 +1194,7 @@ body.board-focus .focus-controls {
 }
 
 /* コート最大表示中だけSTEP一覧を表示します。 */
-body.board-focus .focus-step-list {
+body.board-focus .focus-step-dock {
   display: flex;
 }
 
@@ -2867,7 +2888,7 @@ body.mobile-layout .panel-card {
     right: max(12px, env(safe-area-inset-right));
   }
 
-  body.board-focus .focus-step-list {
+  body.board-focus .focus-step-dock {
     bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
