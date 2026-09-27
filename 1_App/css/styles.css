@@ -1619,6 +1619,16 @@ body.board-focus .focus-editor-panel.open {
   gap: 6px;
 }
 
+.focus-number-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .focus-count-row {
   display: flex;
   align-items: center;
