@@ -447,6 +447,11 @@ button:disabled {
   line-height: 1;
 }
 
+.step-actions .step-icon-button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
 /* 右側パネルを縦に並べます。 */
 .detail-panel {
   display: flex;
@@ -1034,6 +1039,11 @@ button:disabled {
 .focus-button:focus-visible {
   opacity: 0.92;
   background: rgba(17, 24, 39, 0.76);
+}
+
+.focus-button:disabled {
+  opacity: 0.16;
+  cursor: not-allowed;
 }
 
 /* 非表示指定を優先します。 */
