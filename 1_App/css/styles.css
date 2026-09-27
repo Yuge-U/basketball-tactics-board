@@ -1629,6 +1629,14 @@ body.board-focus .focus-editor-panel.open {
   font-weight: 800;
 }
 
+.focus-player-number-details.hidden {
+  display: none;
+}
+
+.focus-player-number-details .player-number-title {
+  color: #ffffff;
+}
+
 .focus-count-row {
   display: flex;
   align-items: center;

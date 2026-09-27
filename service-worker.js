@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v49-focus-counts";
+const CACHE_NAME = "zeroone-canvas-v50-focus-numbers-icons";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
