@@ -562,6 +562,7 @@ const focusBallCount = document.getElementById("focusBallCount");
 // 全番号の開閉要素を取得します。
 const playerNumberDetails = document.getElementById("playerNumberDetails");
 const playerNumberDetailsToggle = document.getElementById("playerNumberDetailsToggle");
+const focusPlayerNumberDetailsToggle = document.getElementById("focusPlayerNumberDetailsToggle");
 // 現在STEPの動作順一覧を取得します。
 const actionOrderList = document.getElementById("actionOrderList");
 // 動作順を初期値へ戻すボタンを取得します。
@@ -4493,12 +4494,15 @@ function adjustBallCount(change) {
 function setPlayerNumberDetailsVisible(visible) {
   playerNumberDetailsVisible = Boolean(visible);
   playerNumberDetails.classList.toggle("hidden", !playerNumberDetailsVisible);
-  playerNumberDetailsToggle.classList.toggle("active", playerNumberDetailsVisible);
-  playerNumberDetailsToggle.setAttribute("aria-expanded", String(playerNumberDetailsVisible));
-  playerNumberDetailsToggle.textContent = "123";
   const hint = playerNumberDetailsVisible ? "全番号を閉じる" : "全番号を表示";
-  playerNumberDetailsToggle.setAttribute("aria-label", hint);
-  playerNumberDetailsToggle.title = hint;
+  [playerNumberDetailsToggle, focusPlayerNumberDetailsToggle].forEach((toggle) => {
+    if (!toggle) return;
+    toggle.classList.toggle("active", playerNumberDetailsVisible);
+    toggle.setAttribute("aria-expanded", String(playerNumberDetailsVisible));
+    toggle.textContent = "123";
+    toggle.setAttribute("aria-label", hint);
+    toggle.title = hint;
+  });
 }
 
 // オフェンスとディフェンスの0番から18番ボタンを描画します。
@@ -7217,6 +7221,9 @@ document.querySelectorAll("[data-ball-count-change]").forEach((button) => {
 
 // 全番号選択欄の開閉ボタンを登録します。
 playerNumberDetailsToggle.addEventListener("click", () => {
+  setPlayerNumberDetailsVisible(!playerNumberDetailsVisible);
+});
+focusPlayerNumberDetailsToggle?.addEventListener("click", () => {
   setPlayerNumberDetailsVisible(!playerNumberDetailsVisible);
 });
 

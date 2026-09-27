@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" href="./1_App/img/zeroone_icon.png" />
   <link rel="apple-touch-icon" href="./1_App/img/zeroone_icon_180.png" />
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=47" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=48" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
 </head>
@@ -316,8 +316,12 @@
               <button type="button" data-ball-size="small" title="ボールサイズ 小">小</button>
             </div>
             <details class="focus-player-count-details">
-              <summary>選手数</summary>
+              <summary>選手・ボール数</summary>
               <div class="focus-player-count-list">
+                <div class="focus-number-toggle-row">
+                  <span>選手番号</span>
+                  <button id="focusPlayerNumberDetailsToggle" class="button compact number-details-toggle" type="button" aria-expanded="false" aria-label="全番号を表示" title="全番号を表示">123</button>
+                </div>
                 <div class="focus-count-row offense">
                   <span>オフェンス</span>
                   <div class="focus-count-control" role="group" aria-label="オフェンス人数">
@@ -334,16 +338,16 @@
                     <button type="button" data-player-count-side="defense" data-player-count-change="-1" title="ディフェンスを1人削除">−</button>
                   </div>
                 </div>
+                <div class="focus-count-row ball">
+                  <span>ボール数</span>
+                  <div class="focus-count-control" role="group" aria-label="ボール数">
+                    <button type="button" data-ball-count-change="1" title="ボールを1個追加">＋</button>
+                    <output id="focusBallCount">1</output>
+                    <button type="button" data-ball-count-change="-1" title="ボールを1個削除">−</button>
+                  </div>
+                </div>
               </div>
             </details>
-            <div class="focus-count-row ball">
-              <span>ボール数</span>
-              <div class="focus-count-control" role="group" aria-label="ボール数">
-                <button type="button" data-ball-count-change="1" title="ボールを1個追加">＋</button>
-                <output id="focusBallCount">1</output>
-                <button type="button" data-ball-count-change="-1" title="ボールを1個削除">−</button>
-              </div>
-            </div>
           </div>
           <!-- 右下の薄いボタンで最大表示中の編集ツールを開閉します。 -->
           <button id="focusEditorToggleButton" class="focus-editor-toggle" type="button" aria-expanded="false" title="編集ツールを表示">✎</button>
@@ -777,6 +781,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=44"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=47"></script>
+  <script defer src="./1_App/js/app.js?v=48"></script>
 </body>
 </html>
