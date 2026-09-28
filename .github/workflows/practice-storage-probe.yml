@@ -1,0 +1,55 @@
+name: ZERO ONE isolated storage probe
+on:
+  push:
+    branches: ['lab/practice-browser-v03']
+    paths: ['practice-lab-probe/**', '.github/workflows/practice-storage-probe.yml']
+permissions:
+  contents: read
+concurrency:
+  group: zero-one-storage-probe
+  cancel-in-progress: false
+jobs:
+  storage-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Prepare verified SQLite and public authentication assets
+        run: |
+          python3 - <<'PY'
+          import hashlib, io, pathlib, urllib.request, zipfile # 公式配布をハッシュ検証して扱います。
+          root = pathlib.Path('practice-lab-probe/site') # CI専用の配置先を指定します。
+          root.mkdir(parents=True, exist_ok=True) # 配信フォルダを準備します。
+          url = 'https://sqlite.org/2026/sqlite-wasm-3530400.zip' # 固定した公式SQLiteを取得します。
+          data = urllib.request.urlopen(url, timeout=60).read() # 個人データを送らず公開ファイルを取得します。
+          expected = 'e4fa7e1750b42f6954115d8e69ffff7dc08da7e9fee6e28a2a0ea6bf228a49f2' # 公式配布ページの検査値を使います。
+          assert hashlib.sha3_256(data).hexdigest() == expected, 'SQLite archive hash mismatch' # 不一致を受け入れません。
+          archive = zipfile.ZipFile(io.BytesIO(data)) # 検査済みZIPを読みます。
+          for name in ['sqlite3.js', 'sqlite3.wasm']: # 必要な実行部品だけを取り出します。
+              matches = [path for path in archive.namelist() if path.endswith('/' + name) or path == name] # 対象ファイルを一意に探します。
+              assert len(matches) == 1, 'Ambiguous archive member' # 別ファイルへの置換を拒否します。
+              (root / name).write_bytes(archive.read(matches[0])) # 部品をローカルCIへ保存します。
+          print('SQLite archive verified', expected) # 取得検証をログに残します。
+          PY
+      - name: Install fixed browser test runner
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium webkit
+      - name: Run actual browser storage checks
+        run: node practice-lab-probe/browser-storage.mjs
+      - name: Preserve results and verified public SQLite assets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-one-storage-probe
+          retention-days: 7
+          path: |
+            practice-lab-probe/results/
+            practice-lab-probe/site/sqlite3.js
+            practice-lab-probe/site/sqlite3.wasm
+          if-no-files-found: warn
