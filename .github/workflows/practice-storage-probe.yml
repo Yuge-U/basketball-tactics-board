@@ -44,6 +44,8 @@ jobs:
         run: |
           npm install --no-save --ignore-scripts playwright@1.63.0
           npx playwright install --with-deps chromium webkit
+      - name: Diagnose profile boundaries and offline emulation without SQLite
+        run: node practice-lab-probe/webkit-diagnostic.mjs
       - name: Run actual browser storage checks
         run: node practice-lab-probe/browser-storage.mjs
       - name: Preserve results and verified public assets
