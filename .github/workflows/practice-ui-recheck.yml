@@ -1,0 +1,49 @@
+name: ZERO ONE isolated PRACTICE UI recheck
+on:
+  push:
+    branches: ['lab/practice-browser-v03']
+    paths: ['practice-ui-lab/**', '.github/workflows/practice-ui-recheck.yml']
+permissions:
+  contents: read
+concurrency:
+  group: zero-one-practice-ui-recheck
+  cancel-in-progress: true
+jobs:
+  practice-ui:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Verify source transport and fixed public runtime dependencies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node practice-ui-lab/prepare-ui.mjs # 本番とは別の公開コードと合成データだけを準備します。
+      - name: Install fixed browser test runner
+        working-directory: practice-ui-lab/app
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.63.0 # 確認済みのバージョンへ固定します。
+          npx playwright install --with-deps chromium webkit # GitHubの検証環境へブラウザを用意します。
+      - name: Exercise PRACTICE UI with browser SQLite and unavailable origin
+        working-directory: practice-ui-lab/app
+        run: npm run test:browser # 実画面の保存・再読込・通信断を検査します。Microsoft認証は行いません。
+      - name: Retain actual results and tested public source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zero-one-ui-recheck-${{ matrix.os }}
+          retention-days: 7
+          path: |
+            practice-ui-lab/app/reports/
+            practice-ui-lab/app/web/
+            practice-ui-lab/app/tools/
+            practice-ui-lab/app/SOURCE_MANIFEST.json
+          if-no-files-found: error
