@@ -6,8 +6,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: zero-one-storage-probe
-  cancel-in-progress: false
+  group: zero-one-storage-probe-fixed
+  cancel-in-progress: true
 jobs:
   storage-probe:
     strategy:
@@ -44,17 +44,19 @@ jobs:
         run: |
           npm install --no-save --ignore-scripts playwright@1.63.0
           npx playwright install --with-deps chromium webkit
-      - name: Diagnose profile boundaries and offline emulation without SQLite
+      - name: Preserve independent root-cause diagnostics including known upstream failures
         run: node practice-lab-probe/webkit-diagnostic.mjs
-      - name: Run actual browser storage checks
-        run: node practice-lab-probe/browser-storage.mjs
-      - name: Preserve results and verified public assets
+      - name: Run isolated browser storage acceptance checks
+        run: node practice-lab-probe/browser-storage-fixed.mjs
+      - name: Preserve all results and reproducible test sources
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: zero-one-storage-probe-${{ matrix.os }}
+          name: zero-one-storage-fixed-${{ matrix.os }}
           retention-days: 7
           path: |
             practice-lab-probe/results/
             practice-lab-probe/site/
-          if-no-files-found: warn
+            practice-lab-probe/fixed-site/
+            practice-lab-probe/*.mjs
+          if-no-files-found: error
