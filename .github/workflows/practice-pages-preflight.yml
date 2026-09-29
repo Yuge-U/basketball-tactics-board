@@ -1,0 +1,51 @@
+name: ZERO ONE Pages preflight # 既存Pagesは変更せず配置条件だけを検証します。
+on: # 起動条件を限定します。
+  push: # 分離ブランチの更新だけを対象にします。
+    branches: ['lab/practice-browser-v03'] # mainでは実行しません。
+    paths: ['practice-publication-lab/**', '.github/workflows/practice-pages-preflight.yml'] # 公開準備の変更だけで実行します。
+permissions: # 検証の権限を限定します。
+  contents: read # 書込・Pages公開・Microsoft管理権限を付与しません。
+concurrency: # 同じ検証の不要な重複を避けます。
+  group: zero-one-pages-preflight # 本番と別のグループを使います。
+  cancel-in-progress: true # 新しい検証を優先します。
+jobs: # OS別に独立試験を行います。
+  pages-preflight: # 実際の公開ではありません。
+    strategy: # 他OSの結果も保存します。
+      fail-fast: false # 一方の失敗で他方を停止しません。
+      matrix: # 二つのOSで確認します。
+        os: [ubuntu-24.04, macos-15] # 物理iPhoneは含みません。
+    runs-on: ${{ matrix.os }} # GitHubの隔離ランナーを使います。
+    timeout-minutes: 15 # 待機を無制限にしません。
+    steps: # 公開コードと合成データだけを扱います。
+      - uses: actions/checkout@v4 # 対象ブランチを取得します。
+        with: # 認証情報を残しません。
+          persist-credentials: false # Git設定にトークンを保持しません。
+      - uses: actions/setup-node@v4 # 検証済み実行環境を用意します。
+        with: # 実行版を固定します。
+          node-version: '22.16.0' # 従来試験と同じ版です。
+      - name: Verify and prepare publication candidate # 検査済みの元ソースに限定します。
+        env: # GitHub公開部品の取得だけに使います。
+          GH_TOKEN: ${{ github.token }} # トークンは公開物に含めません。
+        run: | # 個別ツールに検証を委譲します。
+          node practice-ui-lab/prepare-ui.mjs # 元ソースと依存部品のハッシュを照合します。
+          node practice-ui-lab/patch-ui-tests.mjs # 既に確認した非同期UI試験の修正を適用します。
+          node practice-publication-lab/prepare-pages.mjs # 静的公開の通信方針と配置試験を追加します。
+      - name: Install fixed browser engines # 個人アカウントは使用しません。
+        working-directory: practice-ui-lab/app # 専用検証環境を使います。
+        run: | # ブラウザを版固定します。
+          npm install --no-save --ignore-scripts playwright@1.63.0 # 固定版のみを取得します。
+          npx playwright install --with-deps chromium webkit # 両エンジンを用意します。
+      - name: Check nested path and static CSP # 配置先とデータ保存を実ブラウザで確認します。
+        working-directory: practice-ui-lab/app # 本番ファイルを対象にしません。
+        run: node tools/browser-project.mjs # 11シナリオを各ブラウザで実行します。
+      - name: Retain checked static files and evidence # 実際の公開はしません。
+        if: always() # 失敗の記録も残します。
+        uses: actions/upload-artifact@v4 # GitHubの検証成果物へ保存します。
+        with: # 公開コード・合成画面だけを含めます。
+          name: zero-one-pages-preflight-${{ matrix.os }} # OSごとに区別します。
+          retention-days: 7 # 保存期間を限定します。
+          path: | # ユーザーDB・ブラウザプロファイルは含めません。
+            practice-ui-lab/app/reports/
+            practice-ui-lab/app/web/
+            practice-ui-lab/app/tools/
+          if-no-files-found: error # 証拠がない場合を成功としません。
