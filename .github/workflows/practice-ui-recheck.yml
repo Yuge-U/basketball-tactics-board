@@ -26,7 +26,9 @@ jobs:
       - name: Verify source transport and fixed public runtime dependencies
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node practice-ui-lab/prepare-ui.mjs # 本番とは別の公開コードと合成データだけを準備します。
+        run: |
+          node practice-ui-lab/prepare-ui.mjs # 元ソースと同じ実行内容と部品を検査します。
+          node practice-ui-lab/patch-ui-tests.mjs # 描画完了と入力禁止状態の検査方法を修正します。
       - name: Install fixed browser test runner
         working-directory: practice-ui-lab/app
         run: |
@@ -34,7 +36,7 @@ jobs:
           npx playwright install --with-deps chromium webkit # GitHubの検証環境へブラウザを用意します。
       - name: Exercise PRACTICE UI with browser SQLite and unavailable origin
         working-directory: practice-ui-lab/app
-        run: npm run test:browser # 実画面の保存・再読込・通信断を検査します。Microsoft認証は行いません。
+        run: npm run test:browser # 実画面を検査します。Microsoft認証は行いません。
       - name: Retain actual results and tested public source
         if: always()
         uses: actions/upload-artifact@v4
