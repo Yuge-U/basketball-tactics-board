@@ -23,13 +23,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
-      - name: Prepare verified SQLite
+      - name: Prepare only the verified SQLite required by these tests
         run: |
           python3 - <<'PY'
           import hashlib, io, pathlib, urllib.request, zipfile # 公式配布をハッシュ検証して扱います。
           root = pathlib.Path('practice-lab-probe/site') # CI専用の配置先を指定します。
           root.mkdir(parents=True, exist_ok=True) # 配信フォルダを準備します。
-          data = urllib.request.urlopen('https://sqlite.org/2026/sqlite-wasm-3530400.zip', timeout=60).read() # 公開SQLiteを取得します。
+          data = urllib.request.urlopen('https://sqlite.org/2026/sqlite-wasm-3530400.zip', timeout=60).read() # この試験で実際に使うSQLiteだけを取得します。
           expected = 'e4fa7e1750b42f6954115d8e69ffff7dc08da7e9fee6e28a2a0ea6bf228a49f2' # 固定した公式検査値です。
           assert hashlib.sha3_256(data).hexdigest() == expected, 'SQLite archive hash mismatch' # 不一致は中断します。
           archive = zipfile.ZipFile(io.BytesIO(data)) # 検査済みZIPを読みます。
@@ -39,7 +39,6 @@ jobs:
               (root / name).write_bytes(archive.read(matches[0])) # CIへ部品を保存します。
           print('SQLite archive verified', expected) # 検査結果をログへ残します。
           PY
-          node practice-lab-probe/prepare-probe.mjs
       - name: Install current fixed browser test runner
         run: |
           npm install --no-save --ignore-scripts playwright@1.63.0
