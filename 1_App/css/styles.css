@@ -3039,3 +3039,6 @@ body.mobile-layout .panel-card {
 
 /* コート最大表示では操作群と重ならない左上へZERO ONEロゴを移します。 */
 @media(max-width:820px){body:has(.canvas-shell.focus-mode) .mobile-brand-logo,body:has(.canvas-shell.maximized) .mobile-brand-logo,body:has(.canvas-shell.fullscreen) .mobile-brand-logo{right:auto;left:10px}}
+
+/* 実際の最大表示状態はbody.board-focusなので、ロゴを確実に左上へ移します。 */
+@media(max-width:820px){body.board-focus .mobile-brand-logo{right:auto!important;left:10px!important}}
