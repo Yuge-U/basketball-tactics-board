@@ -3036,3 +3036,6 @@ body.mobile-layout .panel-card {
 /* スマートフォンでは右端の余白にZERO ONEブランドを固定表示します。 */
 .mobile-brand-logo{display:none}
 @media(max-width:820px){.mobile-brand-logo{position:fixed;top:max(8px,env(safe-area-inset-top));right:10px;z-index:40;width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#0b1420e8;box-shadow:0 3px 12px #0003}.mobile-brand-logo img{width:36px;height:36px;display:block;object-fit:contain}}
+
+/* コート最大表示では操作群と重ならない左上へZERO ONEロゴを移します。 */
+@media(max-width:820px){body:has(.canvas-shell.focus-mode) .mobile-brand-logo,body:has(.canvas-shell.maximized) .mobile-brand-logo,body:has(.canvas-shell.fullscreen) .mobile-brand-logo{right:auto;left:10px}}
