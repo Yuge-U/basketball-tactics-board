@@ -17,6 +17,13 @@ const config = {"url": "https://yuge-u.github.io/basketball-tactics-board/", "fi
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => { const img=document.querySelector('.zeroone-splash img'); return img && img.complete && img.naturalWidth>0; });
     assert.ok((await page.locator('.zeroone-splash img').getAttribute('src')).includes('20261007d'));
+    await page.locator('.zeroone-splash').waitFor({ state: 'hidden' });
+    if (await page.locator('#termsAcceptCheckbox').isVisible()) {
+      await page.locator('#termsAcceptCheckbox').check();
+      await page.locator('#acceptTermsButton').click();
+    }
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('.zeroone-splash img').evaluate(img => img.decode());
     await page.screenshot({ path: 'production-splash.png' });
     await page.locator('.zeroone-splash').waitFor({ state: 'hidden' });
     await page.waitForLoadState('networkidle');
