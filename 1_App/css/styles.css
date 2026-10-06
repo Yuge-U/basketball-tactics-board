@@ -3032,3 +3032,7 @@ body.mobile-layout .panel-card {
 
 /* ZERO ONE 共通ブランドの起動画面です。 */
 .zeroone-splash{position:fixed;inset:0;z-index:99999;display:grid;place-content:center;justify-items:center;gap:12px;color:#fff;background:radial-gradient(circle at 50% 36%,#102638,#03070c 68%);animation:zerooneSplash 1.8s ease forwards;pointer-events:none}.zeroone-splash img{width:132px;height:132px;object-fit:contain}.zeroone-splash strong{font-size:30px;letter-spacing:.18em}.zeroone-splash span{font-size:16px;letter-spacing:.34em;color:#8bcaff}@keyframes zerooneSplash{0%,70%{opacity:1}100%{opacity:0;visibility:hidden}}
+
+/* スマートフォンでは右端の余白にZERO ONEブランドを固定表示します。 */
+.mobile-brand-logo{display:none}
+@media(max-width:820px){.mobile-brand-logo{position:fixed;top:max(8px,env(safe-area-inset-top));right:10px;z-index:40;width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#0b1420e8;box-shadow:0 3px 12px #0003}.mobile-brand-logo img{width:36px;height:36px;display:block;object-fit:contain}}
