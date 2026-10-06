@@ -3029,3 +3029,6 @@ body.mobile-layout .panel-card {
     text-align: left;
   }
 }
+
+/* ZERO ONE 共通ブランドの起動画面です。 */
+.zeroone-splash{position:fixed;inset:0;z-index:99999;display:grid;place-content:center;justify-items:center;gap:12px;color:#fff;background:radial-gradient(circle at 50% 36%,#102638,#03070c 68%);animation:zerooneSplash 1.8s ease forwards;pointer-events:none}.zeroone-splash img{width:132px;height:132px;object-fit:contain}.zeroone-splash strong{font-size:30px;letter-spacing:.18em}.zeroone-splash span{font-size:16px;letter-spacing:.34em;color:#8bcaff}@keyframes zerooneSplash{0%,70%{opacity:1}100%{opacity:0;visibility:hidden}}
