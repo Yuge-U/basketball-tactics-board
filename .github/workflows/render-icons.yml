@@ -22,4 +22,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add 1_App/img/zeroone_icon.png 1_App/img/zeroone_icon_180.png 1_App/img/zeroone_icon_192.png 1_App/img/zeroone_icon_512.png
           git diff --cached --quiet || git commit -m "Render ZERO ONE Canvas icons"
-          git push
+          branch="automation/render-zero-one-icons"
+          git checkout -B "$branch"
+          git push --force origin "$branch"
+          echo "Rendered icons pushed to $branch; merge through a pull request because main is protected."
