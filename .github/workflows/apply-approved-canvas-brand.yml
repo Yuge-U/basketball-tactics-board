@@ -1,0 +1,35 @@
+name: Apply approved ZERO ONE CANVAS artwork
+on:
+  push:
+    branches: [brand/approved-icon-20261007]
+    paths: ['branding/import/canvas.ready']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --ignore-scripts sharp@0.33.5
+      - run: node scripts/apply-approved-canvas-brand.mjs
+      - name: Verify branding references
+        run: |
+          grep -q 'zeroone_brand.svg?v=20261007a' index.html
+          grep -q 'zeroone_icon_192.png?v=20261007a' index.html
+          grep -q 'zeroone_icon_180.png?v=20261007a' index.html
+          test -s 1_App/img/zeroone_icon_180.png
+          test -s 1_App/img/zeroone_icon_192.png
+          test -s 1_App/img/zeroone_icon_512.png
+      - name: Commit approved artwork
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html 1_App/img/zeroone_brand.svg 1_App/img/zeroone_icon.png 1_App/img/zeroone_icon_180.png 1_App/img/zeroone_icon_192.png 1_App/img/zeroone_icon_512.png
+          git diff --cached --quiet || git commit -m "Apply approved ZERO ONE CANVAS branding"
+          git push origin HEAD:brand/approved-icon-20261007
