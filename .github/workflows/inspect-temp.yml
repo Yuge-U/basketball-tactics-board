@@ -1,0 +1,16 @@
+name: Inspect temporary brand asset
+on:
+  push:
+    branches: [tmp/inspect-brand-0fc]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: inspect-brand-0fc
+          path: tmp-inspect/blob-0fc.webp
+          retention-days: 1
