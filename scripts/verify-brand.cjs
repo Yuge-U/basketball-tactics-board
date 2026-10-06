@@ -22,6 +22,7 @@ const config = {"url": "https://yuge-u.github.io/basketball-tactics-board/", "fi
       await page.locator('#termsAcceptCheckbox').check();
       await page.locator('#acceptTermsButton').click();
     }
+    if (await page.locator('#guideSkipButton').isVisible()) await page.locator('#guideSkipButton').click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.locator('.zeroone-splash img').evaluate(img => img.decode());
     await page.screenshot({ path: 'production-splash.png' });
