@@ -19,7 +19,7 @@ jobs:
           node-version: 22
       - run: npm install --no-save --package-lock=false sharp@0.33.5
       - run: node scripts/render-icons.mjs
-      - run: git diff --exit-code -- 1_App/img/zeroone_icon.svg 1_App/img/zeroone_icon.png 1_App/img/zeroone_icon_180.png 1_App/img/zeroone_icon_192.png 1_App/img/zeroone_icon_512.png
+      - run: git diff --exit-code -- apple-touch-canvas-180-20261007k.png apple-touch-icon.png apple-touch-icon-precomposed.png safari-canvas-180-20261007j.png safari-canvas-192-20261007j.png 1_App/img/zeroone_icon.svg 1_App/img/zeroone_icon.png 1_App/img/zeroone_icon_180.png 1_App/img/zeroone_icon_192.png 1_App/img/zeroone_icon_512.png
   verify-production:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: render
