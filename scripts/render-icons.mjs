@@ -13,4 +13,5 @@ await writeFile(path.join(root,'1_App/img/zeroone_icon.svg'), `<svg xmlns="http:
 
 for (const size of [180,192]) await copyFile(path.join(root,`1_App/img/zeroone_icon_${size}.png`),path.join(root,`safari-canvas-${size}-20261007j.png`));
 
-for (const file of ['apple-touch-canvas-180-20261007k.png','apple-touch-icon.png','apple-touch-icon-precomposed.png']) await copyFile(path.join(root,'1_App/img/zeroone_icon_180.png'),path.join(root,file));
+const bookmark = await sharp(await readFile(path.join(root,'branding/zero-one-bookmark-master.jpg'))).resize(180,180,{fit:'contain',background:'#000000',withoutEnlargement:true,kernel:'lanczos3'}).png().toBuffer();
+for (const file of ['apple-touch-zero-one-180-20261007m.png','apple-touch-icon.png','apple-touch-icon-precomposed.png']) await writeFile(path.join(root,file),bookmark);
