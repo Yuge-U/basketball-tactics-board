@@ -1,9 +1,9 @@
 /* One registration, static same-origin application assets only. No auth/API caching. */
-const BUILD_ID='48359c44c2ea066e7dab5fd0e8b032b498e7c118307468048dbba299f3e5680d';
-const APP='CANVAS';
-const CACHE_PREFIX='zeroone-canvas-release-';
-const APP_VERSION='53';
-const APP_ASSETS=["1_App/css/styles.css","1_App/img/zeroone_icon.png","1_App/img/zeroone_icon_512.png","1_App/js/app.js","1_App/js/folder-access.js","1_App/js/onedrive-config.js","1_App/js/onedrive-storage.js","1_App/js/vendor/msal-browser.min.js","1_App/manifest.webmanifest","Basketball_Tactics_Board.html","apple-touch-zero-one-180-20261007m.png","boot.js","brand-entry.js","index.html","manifest.webmanifest","safari-canvas-192-20261007j.png","service-worker.js","zero-one-connection.css","zero-one-connection.js","zero-one-update.css","zero-one-update.js"];
+const BUILD_ID='__ZERO_ONE_BUILD__';
+const APP='__ZERO_ONE_APP__';
+const CACHE_PREFIX='__ZERO_ONE_CACHE_PREFIX__';
+const APP_VERSION='__ZERO_ONE_VERSION__';
+const APP_ASSETS=__ZERO_ONE_ASSETS__;
 const clientBuilds=new Map();
 let releasePromise;
 const validId=id=>typeof id==='string'&&/^[a-f0-9]{64}$/.test(id);
