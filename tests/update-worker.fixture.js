@@ -3,6 +3,7 @@ const BUILD_ID='__ZERO_ONE_BUILD__';
 const APP='__ZERO_ONE_APP__';
 const CACHE_PREFIX='__ZERO_ONE_CACHE_PREFIX__';
 const APP_VERSION='__ZERO_ONE_VERSION__';
+const APP_ASSETS=__ZERO_ONE_ASSETS__;
 const clientBuilds=new Map();
 let releasePromise;
 const validId=id=>typeof id==='string'&&/^[a-f0-9]{64}$/.test(id);
@@ -23,7 +24,8 @@ self.addEventListener('message',event=>{
 });
 self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);if(request.method!=='GET'||url.origin!==new URL(base).origin||!url.href.startsWith(base)||url.pathname===new URL('app-version.json',base).pathname||authReturn(url))return;
-  event.respondWith((async()=>{const data=await release();const path=url.pathname.slice(new URL(base).pathname.length)||'index.html';if(!data.files.some(file=>file.path===path))return fetch(request);
+  const path=url.pathname.slice(new URL(base).pathname.length)||'index.html';if(!APP_ASSETS.includes(path))return;
+  event.respondWith((async()=>{await release();
     const requested=url.searchParams.get('build'),client=clientBuilds.get(event.clientId);const version=request.mode==='navigate'?BUILD_ID:validId(requested)?requested:client||BUILD_ID;
     const cache=await caches.open(CACHE_PREFIX+version);const response=await cache.match(new URL(path,base));if(response)return response;return fetch(request,{cache:'no-store'});
   })().catch(()=>Response.error()));

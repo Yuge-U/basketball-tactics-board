@@ -9,6 +9,7 @@ async function scan(directory,recursive){for(const entry of await readdir(join(r
 if(!config.files){await scan('',false);for(const directory of config.directories||[])await scan(directory,true);}
 // Preserve the existing manifest/icon URLs and cache their static bodies in SW apps.
 if(!config.files)for(const name of [...files].filter(name=>name.endsWith('.html'))){const html=await readFile(join(root,name),'utf8');for(const match of html.matchAll(/<(?:img|link)\b[^>]*(?:src|href)=["']([^"']+)["']/g)){const value=match[1];if(/^(?:https?:|\/\/|data:|#)/.test(value))continue;const path=value.replace(/^\.\//,'').split(/[?#]/)[0];if(/\.(?:png|webp|svg|ico|webmanifest)$/.test(path)&&!path.includes('..')&&!path.startsWith('/'))files.add(path);}}
+const appAssets=JSON.stringify([...files].sort());
 const htmlNames=[...files].filter(name=>name.endsWith('.html'));const canonical=new Map();
 for(const name of [...files].sort()){
   let bytes=await readFile(join(root,name));
@@ -17,7 +18,7 @@ for(const name of [...files].sort()){
     if(!html.includes('zero-one-update.js'))html=html.replace('</body>','<script defer src="./zero-one-update.js"></script>\n</body>');
     if(!html.includes('zero-one-update.css'))html=html.replace('</head>','<link rel="stylesheet" href="./zero-one-update.css">\n</head>');
     canonical.set(name,Buffer.from(html));
-  }else if(name===config.worker){canonical.set(name,Buffer.from(bytes.toString().replace(/const BUILD_ID='[a-f0-9]{64}';/,"const BUILD_ID='__ZERO_ONE_BUILD__';")));}
+  }else if(name===config.worker){canonical.set(name,Buffer.from(bytes.toString().replace(/const BUILD_ID='[a-f0-9]{64}';/,"const BUILD_ID='__ZERO_ONE_BUILD__';").replace(/const APP_ASSETS=(?:__ZERO_ONE_ASSETS__|\[[^\n]*\]);/,'const APP_ASSETS='+appAssets+';')));}
   else canonical.set(name,bytes);
 }
 const buildId=hash(Buffer.concat([...canonical].flatMap(([name,bytes])=>[Buffer.from(name+'\0'),bytes,Buffer.from('\0')])));

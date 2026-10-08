@@ -1,8 +1,9 @@
 /* One registration, static same-origin application assets only. No auth/API caching. */
-const BUILD_ID='a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e';
+const BUILD_ID='48359c44c2ea066e7dab5fd0e8b032b498e7c118307468048dbba299f3e5680d';
 const APP='CANVAS';
 const CACHE_PREFIX='zeroone-canvas-release-';
 const APP_VERSION='53';
+const APP_ASSETS=["1_App/css/styles.css","1_App/img/zeroone_icon.png","1_App/img/zeroone_icon_512.png","1_App/js/app.js","1_App/js/folder-access.js","1_App/js/onedrive-config.js","1_App/js/onedrive-storage.js","1_App/js/vendor/msal-browser.min.js","1_App/manifest.webmanifest","Basketball_Tactics_Board.html","apple-touch-zero-one-180-20261007m.png","boot.js","brand-entry.js","index.html","manifest.webmanifest","safari-canvas-192-20261007j.png","service-worker.js","zero-one-connection.css","zero-one-connection.js","zero-one-update.css","zero-one-update.js"];
 const clientBuilds=new Map();
 let releasePromise;
 const validId=id=>typeof id==='string'&&/^[a-f0-9]{64}$/.test(id);
@@ -23,7 +24,8 @@ self.addEventListener('message',event=>{
 });
 self.addEventListener('fetch',event=>{
   const request=event.request,url=new URL(request.url);if(request.method!=='GET'||url.origin!==new URL(base).origin||!url.href.startsWith(base)||url.pathname===new URL('app-version.json',base).pathname||authReturn(url))return;
-  event.respondWith((async()=>{const data=await release();const path=url.pathname.slice(new URL(base).pathname.length)||'index.html';if(!data.files.some(file=>file.path===path))return fetch(request);
+  const path=url.pathname.slice(new URL(base).pathname.length)||'index.html';if(!APP_ASSETS.includes(path))return;
+  event.respondWith((async()=>{await release();
     const requested=url.searchParams.get('build'),client=clientBuilds.get(event.clientId);const version=request.mode==='navigate'?BUILD_ID:validId(requested)?requested:client||BUILD_ID;
     const cache=await caches.open(CACHE_PREFIX+version);const response=await cache.match(new URL(path,base));if(response)return response;return fetch(request,{cache:'no-store'});
   })().catch(()=>Response.error()));
