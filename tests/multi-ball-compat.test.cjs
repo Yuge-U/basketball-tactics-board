@@ -118,6 +118,8 @@ const context = vm.createContext({
 });
 windowObject.window = windowObject;
 windowObject.requestAnimationFrame = context.requestAnimationFrame;
+// Connection rendering is exercised separately in the series browser checks.
+windowObject.ZeroOneConnection = { create: () => ({ update() {}, open() {} }) };
 
 const appPath = path.join(__dirname, "..", "1_App", "js", "app.js");
 let source = fs.readFileSync(appPath, "utf8");

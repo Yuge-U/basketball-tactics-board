@@ -75,6 +75,7 @@ const context = vm.createContext({
 });
 
 const source = fs.readFileSync(path.join(__dirname, "..", "1_App", "js", "onedrive-storage.js"), "utf8");
+context.window.ZeroOneConnection = require("../zero-one-connection.js");
 vm.runInContext(source, context, { filename: "onedrive-storage.js" });
 
 (async () => {

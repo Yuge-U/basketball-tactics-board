@@ -1,10 +1,12 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v50-focus-numbers-icons";
+const CACHE_NAME = "zeroone-canvas-v52-compact-connection";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [
   "./",
   "./index.html",
+  "./zero-one-connection.js",
+  "./zero-one-connection.css",
   "./Basketball_Tactics_Board.html",
   "./1_App/manifest.webmanifest",
   "./1_App/css/styles.css",
@@ -32,7 +34,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      keys.filter((key) => key.startsWith("zeroone-canvas-") && key !== CACHE_NAME).map((key) => caches.delete(key))
     ))
   );
   self.clients.claim();
