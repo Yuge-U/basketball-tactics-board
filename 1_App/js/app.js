@@ -711,6 +711,7 @@ async function applySaveFolders(nextFolders, options = {}) {
       saveFoldersUpdatedAt = String(saved?.updatedAt || saveFoldersUpdatedAt);
       writeSaveFolderRecord();
       setSaveFolderManagerStatus("この一覧はOneDrive経由で他の端末にも同期されます。");
+      return true;
     } catch (error) {
       console.warn("保存フォルダ一覧をOneDriveへ同期できませんでした。", error);
       setSaveFolderManagerStatus("端末には保存しましたが、OneDriveへ同期できませんでした。", true);
@@ -752,6 +753,7 @@ async function syncSaveFoldersFromOneDrive() {
     } catch (error) {
       console.warn("OneDriveの保存フォルダ一覧を同期できませんでした。", error);
       setSaveFolderManagerStatus("OneDriveとの同期に失敗しました。端末内の一覧を使用します。", true);
+      return false;
     } finally {
       folderSettingsSyncPromise = null;
     }
@@ -5864,17 +5866,33 @@ function openAppSettings() {
   if (!settingsDialog.open) settingsDialog.showModal();
 }
 
+const advancedConnectionSettings = document.getElementById('advancedConnectionSettings');
+if (advancedConnectionSettings) advancedConnectionSettings.onclick = () => { settingsDialog.close(); openOneDriveSettings(); };
+let connectionSync = { state: 'idle', title: '保存済みの作戦はOneDriveから読み込めます。', detail: '編集中の作戦は「保存」を押して登録してください。' };
+async function syncConnectionLibrary() {
+  connectionSync = { state: 'busy', title: '保存フォルダーと作戦の一覧を確認中…' }; updateOneDriveInterface();
+  try {
+    if (await syncSaveFoldersFromOneDrive() === false) throw new Error('保存フォルダーの同期が完了しませんでした。');
+    await preloadOneDriveLibrary(true);
+    if (libraryDialog.open) await renderLibrary({ cacheOnly: true });
+    connectionSync = { state: 'synced', title: '一覧更新済み · ' + new Date().toLocaleTimeString('ja-JP'), detail: '編集中の作戦は「保存」を押して登録してください。' };
+  } catch (error) {
+    connectionSync = { state: 'error', title: '一覧の同期未完了', detail: error.message }; throw error;
+  } finally { updateOneDriveInterface(); }
+}
+window.addEventListener('offline', () => updateOneDriveInterface());
+window.addEventListener('online', () => updateOneDriveInterface());
 const connectionUi = window.ZeroOneConnection.create({
   mount: '#zeroOneConnection', presentation: 'compact', connect: () => window.OneDriveStorage.signIn(),
   retry: async () => { await window.OneDriveStorage.checkConnection(); if (!window.OneDriveStorage.isConnected()) await window.OneDriveStorage.signIn(); },
   switchAccount: () => window.OneDriveStorage.signIn({ chooseAccount: true }),
   signOut: async () => { if (window.confirm('この端末のOneDrive接続を解除しますか？ OneDrive上のデータは削除されません。')) await window.OneDriveStorage.signOut(); },
-  settings: openOneDriveSettings
+  sync: syncConnectionLibrary, settings: openAppSettings, settingsLabel: 'バックアップ・保存設定'
 });
 
 // OneDriveの接続状態を画面へ反映します。
 function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.() || {}) {
-  connectionUi.update({ ...nextStatus, account: Boolean(nextStatus.username || nextStatus.account),
+  connectionUi.update({ ...nextStatus, sync: navigator.onLine ? connectionSync : { state: 'offline', title: 'オフラインです。通信が戻ってから同期してください。' }, busy: connectionSync.state === 'busy', syncDisabled: !navigator.onLine, account: Boolean(nextStatus.username || nextStatus.account),
     state: !nextStatus.configured ? 'error' : nextStatus.state || 'checking',
     detail: !nextStatus.configured ? 'アプリの接続設定を確認してください。' : nextStatus.detail });
   const configured = Boolean(nextStatus.configured);
