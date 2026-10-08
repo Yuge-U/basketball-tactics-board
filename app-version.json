@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "app": "CANVAS",
+  "buildId": "a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e",
+  "files": [
+    {
+      "path": "1_App/css/styles.css",
+      "sha256": "5f84f758154f809e44013a07649e185f7344a97596d6f4d32738bee3ae7ed33e"
+    },
+    {
+      "path": "1_App/img/zeroone_icon.png",
+      "sha256": "3c5d8735ea52f4e6f0c052bc364df4849654f23539bf9e5446cf8d8397fb268e"
+    },
+    {
+      "path": "1_App/img/zeroone_icon_512.png",
+      "sha256": "3c5d8735ea52f4e6f0c052bc364df4849654f23539bf9e5446cf8d8397fb268e"
+    },
+    {
+      "path": "1_App/js/app.js",
+      "sha256": "3f3bb209daff479668506714d90ac8765c302e82fae4eb6e4ddca4619c40954b"
+    },
+    {
+      "path": "1_App/js/folder-access.js",
+      "sha256": "b48a70e40f4cef72184eaa0743bb076f313c2f3c4ffa86b2ed479f0163ac4950"
+    },
+    {
+      "path": "1_App/js/onedrive-config.js",
+      "sha256": "057c1b21a7701ba3ebb0ef97e8ffafc3ab470be7094e11067bca3ede5cda201e"
+    },
+    {
+      "path": "1_App/js/onedrive-storage.js",
+      "sha256": "be4266736c8bfcd506885045b56fb9f4dd0a9ec72979402e70b913003fd543f6"
+    },
+    {
+      "path": "1_App/js/vendor/msal-browser.min.js",
+      "sha256": "074de35a99c1e7fa51d6e235cdaf688d4a24af91f43aef9c54532afcbba62ef2"
+    },
+    {
+      "path": "1_App/manifest.webmanifest",
+      "sha256": "056b1dfa78ca62889df0b884d893f37e32fdce109fd2a73ed6a024bcbb997a43"
+    },
+    {
+      "path": "Basketball_Tactics_Board.html",
+      "sha256": "18ea85411e695e3361eb125b9754713a28c5c5c1f52e7045895057831bbfabe3"
+    },
+    {
+      "path": "apple-touch-zero-one-180-20261007m.png",
+      "sha256": "2a67fb30e4d25670d28f9517dad80525f1bd44f1081147e3586e5b58725b2f1e"
+    },
+    {
+      "path": "boot.js",
+      "sha256": "adc3fd848783a8db8b3d95ec69d4024be669e3a7fc3f76636afd91fc6378942f"
+    },
+    {
+      "path": "brand-entry.js",
+      "sha256": "cbc89fee2fc235866502ea4b213f276873d405f40a081d71eebff83f8b7c9e33"
+    },
+    {
+      "path": "index.html",
+      "sha256": "0eb0f0f850935be5978013e16a5ffac10008f16a23e2c67edea8d83ac64d3a9f"
+    },
+    {
+      "path": "manifest.webmanifest",
+      "sha256": "a61504ac0f202da5767fe5cad508382690637f392f70ca51d04a6f69e8709b75"
+    },
+    {
+      "path": "safari-canvas-192-20261007j.png",
+      "sha256": "75e4cb4a878af0ce7a2bba2bc6b2f060c6e780acfde040d5d7c035bbdacbfdf8"
+    },
+    {
+      "path": "service-worker.js",
+      "sha256": "1101d08cb119f4a308763b30355b5131a1ce17d7d24e4810c96de6a7195eb184"
+    },
+    {
+      "path": "zero-one-connection.css",
+      "sha256": "5ca96de52e054fa5ac95c67fa9bd5629cfa592a2b6d489fe6b1aaa1d94066c66"
+    },
+    {
+      "path": "zero-one-connection.js",
+      "sha256": "75fd15f47ddd54abbceb21ae95ccff7dc139c8245d761d3d1f7be83f8594957c"
+    },
+    {
+      "path": "zero-one-update.css",
+      "sha256": "56caba661c2b1da58ab01628bdcc307179730e320422f5763c340ec463bc663e"
+    },
+    {
+      "path": "zero-one-update.js",
+      "sha256": "cc8dd9092d096d31d25eb0ee9ac6858bc2625c6d1b9574f0d65c332f9dc8db2e"
+    }
+  ]
+}

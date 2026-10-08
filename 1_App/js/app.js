@@ -696,7 +696,7 @@ function renderSaveFolderManager() {
 }
 
 // 保存フォルダ一覧を端末へ保存し、接続中ならOneDriveへも同期します。
-async function applySaveFolders(nextFolders, options = {}) {
+async function applySaveFoldersForUpdateGuard(nextFolders, options = {}) {
   saveFolders = normalizeSaveFolderList(nextFolders);
   saveFoldersUpdatedAt = String(options.updatedAt || new Date().toISOString());
   writeSaveFolderRecord();
@@ -1155,7 +1155,7 @@ function getImportedMediaSize(width, height) {
 }
 
 // 選択された画像または動画を現在STEPへ追加します。
-async function importMediaFile(event, type) {
+async function importMediaFileForUpdateGuard(event, type) {
   const input = event.currentTarget;
   const file = input.files?.[0];
   input.value = "";
@@ -5656,7 +5656,7 @@ function downloadRecordedVideo(blob, extension) {
 }
 
 // 全STEPの連続再生をCanvasから録画して動画へ保存します。
-async function exportPlaybackVideo() {
+async function exportPlaybackVideoForUpdateGuard() {
   // 二重録画を防ぎます。
   if (activeVideoRecorder) {
     showToast("動画を録画中です");
@@ -5800,7 +5800,7 @@ function exportJson() {
 }
 
 // 選択されたJSONファイルを読み込みます。
-async function importJson(event) {
+async function importJsonForUpdateGuard(event) {
   // 選択されたファイルを取得します。
   const file = event.target.files?.[0];
   // ファイルがない場合は終了します。
@@ -6332,7 +6332,7 @@ async function requestFolderApi(path, options = {}) {
 }
 
 // 現在作戦を2_Play_Dataへ保存します。
-async function savePlayToLibrary() {
+async function savePlayToLibraryForUpdateGuard() {
   // 入力欄から作戦名を取得します。
   const name = playNameInput.value.trim() || "名称未設定の作戦";
   // 利用者が選択した保存フォルダを取得します。
@@ -6586,7 +6586,7 @@ async function hydrateLibraryCache() {
 }
 
 // 現在のOneDrive一覧と作戦本体を端末へ保存します。
-async function persistLibraryCache() {
+async function persistLibraryCacheForUpdateGuard() {
   if (!window.indexedDB || !libraryCacheAccountKey) return;
   try {
     const database = await openLibraryCacheDatabase();
@@ -6878,7 +6878,7 @@ async function renderLibrary(options = {}) {
 }
 
 // 保存済み作戦を開きます。
-async function loadLibraryItem(item) {
+async function loadLibraryItemForUpdateGuard(item) {
   try {
     // 読込対象のスナップショットを保持します。
     let snapshot = item.snapshot;
@@ -6919,7 +6919,7 @@ async function loadLibraryItem(item) {
 }
 
 // 保存済み作戦を削除します。
-async function deleteLibraryItem(item) {
+async function deleteLibraryItemForUpdateGuard(item) {
   // 削除確認でキャンセルされた場合は終了します。
   const deleteMessage = item.source === "onedrive"
     ? `「${item.name}」の作戦JSONを削除しますか？\n\n関連する動画ファイルは誤削除を防ぐためOneDriveに残します。`
@@ -7632,3 +7632,15 @@ syncInterface(false);
 requestAnimationFrame(resizeCanvas);
 // アプリの初期化が完了したことをHTML側へ通知します。
 document.documentElement.dataset.appReady = "true";
+
+// Update protection uses the existing autosave and save operations. No data migration.
+let zeroOneUpdateBusy=0;
+async function savePlayToLibrary(...args){zeroOneUpdateBusy++;try{return await savePlayToLibraryForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function importMediaFile(...args){zeroOneUpdateBusy++;try{return await importMediaFileForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function importJson(...args){zeroOneUpdateBusy++;try{return await importJsonForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function loadLibraryItem(...args){zeroOneUpdateBusy++;try{return await loadLibraryItemForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function deleteLibraryItem(...args){zeroOneUpdateBusy++;try{return await deleteLibraryItemForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function applySaveFolders(...args){zeroOneUpdateBusy++;try{return await applySaveFoldersForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function persistLibraryCache(...args){zeroOneUpdateBusy++;try{return await persistLibraryCacheForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+async function exportPlaybackVideo(...args){zeroOneUpdateBusy++;try{return await exportPlaybackVideoForUpdateGuard(...args);}finally{zeroOneUpdateBusy--;}}
+window.ZeroOneUpdateGuard=()=>{let dirty=true;try{dirty=autosaveWarningShown||localStorage.getItem(AUTOSAVE_KEY)!==JSON.stringify(createSnapshot())||playNameInput.value!==state.playName||JSON.stringify(String(playTagsInput?.value||'').split(',').map(tag=>tag.trim()).filter(Boolean))!==JSON.stringify(state.libraryMeta?.tags||[])||Boolean(playFavoriteInput?.checked)!==Boolean(state.libraryMeta?.favorite);}catch{}return {ready:true,busy:Boolean(zeroOneUpdateBusy||['checking','connecting'].includes(window.OneDriveStorage?.status?.().state)||bulkTransferInProgress||dragSession||drawSession||playbackVisual||playbackTimer||playbackFrame),dirty:dirty||Boolean(document.querySelector('dialog[open] input:not([readonly]),dialog[open] textarea')),message:'編集中の内容を保存し、入力画面を閉じてから更新してください。'};};

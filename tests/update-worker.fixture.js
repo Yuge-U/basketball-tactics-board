@@ -1,8 +1,8 @@
 /* One registration, static same-origin application assets only. No auth/API caching. */
-const BUILD_ID='a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e';
-const APP='CANVAS';
-const CACHE_PREFIX='zeroone-canvas-release-';
-const APP_VERSION='53';
+const BUILD_ID='__ZERO_ONE_BUILD__';
+const APP='__ZERO_ONE_APP__';
+const CACHE_PREFIX='__ZERO_ONE_CACHE_PREFIX__';
+const APP_VERSION='__ZERO_ONE_VERSION__';
 const clientBuilds=new Map();
 let releasePromise;
 const validId=id=>typeof id==='string'&&/^[a-f0-9]{64}$/.test(id);

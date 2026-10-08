@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ja">
-<head><script src="./brand-entry.js?v=20261007k"></script>
+<head><meta name="zero-one-build" content="a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e" data-app="CANVAS" data-worker="service-worker.js" data-version-mount="#settingsDialog">
+<script src="./brand-entry.js?v=20261007k&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
   <!-- 文字コードをUTF-8に固定します。 -->
   <meta charset="UTF-8" />
   <!-- スマートフォンとタブレットで画面幅を正しく扱います。 -->
@@ -21,10 +22,11 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./safari-canvas-192-20261007j.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-zero-one-180-20261007m.png">
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=49" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=49&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
-<link rel="stylesheet" href="./zero-one-connection.css?v=20261008-login2">
+<link rel="stylesheet" href="./zero-one-connection.css?v=20261008-login2&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e">
+<link rel="stylesheet" href="./zero-one-update.css?build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e">
 </head>
 <body>
   <!-- アプリ全体を包む領域です。 -->
@@ -768,26 +770,13 @@
       }, 1000);
     });
   </script>
-  <!-- HTTPS公開時にアプリ本体を端末へ保存します。 -->
-  <script>
-    // Service Workerに対応したHTTPS環境だけで登録します。
-    if ("serviceWorker" in navigator && window.location.protocol === "https:") {
-      // ページ読込後に登録して初期表示を妨げないようにします。
-      window.addEventListener("load", function () {
-        // GitHub Pagesのリポジトリ配下を基準にService Workerを登録します。
-        navigator.serviceWorker.register("./service-worker.js").catch(function (error) {
-          // 登録失敗はアプリ本体の利用を妨げないため、開発者コンソールだけへ記録します。
-          console.warn("Service Worker registration failed:", error);
-        });
-      });
-    }
-  </script>
   <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
-  <script src="./zero-one-connection.js?v=20261008-login2"></script>
-  <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
-  <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
-  <script defer src="./1_App/js/onedrive-storage.js?v=45"></script>
-  <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=51"></script>
+  <script src="./zero-one-connection.js?v=20261008-login2&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
+  <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
+  <script defer src="./1_App/js/onedrive-config.js?v=22&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
+  <script defer src="./1_App/js/onedrive-storage.js?v=45&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
+  <script defer src="./1_App/js/folder-access.js?v=22&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
+  <script defer src="./1_App/js/app.js?v=51&build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
+<script defer src="./zero-one-update.js?build=a38638792b960493787d963cee6dd7a9f6b9a36bc8621be6d84d87355ce0585e"></script>
 </body>
 </html>
