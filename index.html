@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="./1_App/css/styles.css?v=50" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
-<link rel="stylesheet" href="./zero-one-connection.css?v=20261008-login2">
+<link rel="stylesheet" href="./zero-one-connection.css?v=20261008-hub">
 </head>
 <body><a class="mobile-brand-logo" href="#" aria-label="ZERO ONE CANVAS"><img src="./1_App/img/zeroone_icon_512.png?v=20261007d" alt="ZERO ONE"></a><div class="zeroone-splash" aria-hidden="true"><img src="./1_App/img/zeroone_icon_512.png?v=20261007d" alt=""><strong>ZERO ONE</strong><span>CANVAS</span></div>
   <!-- アプリ全体を包む領域です。 -->
@@ -652,6 +652,7 @@
         <p id="bulkTransferStatus" class="settings-status" role="status" aria-live="polite"></p>
       </section>
 
+      <section class="settings-section compact-settings-section"><h3>OneDriveの詳細設定</h3><button id="advancedConnectionSettings" class="button" type="button">接続の詳細を確認する</button></section>
       <section class="settings-section compact-settings-section">
         <h3>操作ガイド</h3>
         <button id="openGuideButton" class="button" type="button">操作ガイドを見る</button>
@@ -783,11 +784,11 @@
     }
   </script>
   <!-- 通常スクリプトとして読み込み、file://で直接開いた場合も動作させます。 -->
-  <script src="./zero-one-connection.js?v=20261008-login2"></script>
+  <script src="./zero-one-connection.js?v=20261008-hub"></script>
   <script defer src="./1_App/js/vendor/msal-browser.min.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=45"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=51"></script>
+  <script defer src="./1_App/js/app.js?v=53"></script>
 </body>
 </html>
