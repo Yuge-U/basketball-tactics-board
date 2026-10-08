@@ -463,11 +463,9 @@ const mobileLayoutButton = document.getElementById("mobileLayoutButton");
 const librarySearchInput = document.getElementById("librarySearch");
 const libraryFolderFilter = document.getElementById("libraryFolderFilter");
 const libraryFavoriteOnly = document.getElementById("libraryFavoriteOnly");
-const connectFolderButton = document.getElementById("connectFolderButton");
 const refreshLibraryButton = document.getElementById("refreshLibraryButton");
 const folderModeMessage = document.getElementById("folderModeMessage");
 const oneDriveDialog = document.getElementById("oneDriveDialog");
-const oneDriveButton = document.getElementById("oneDriveButton");
 const settingsDialog = document.getElementById("settingsDialog");
 const settingsButton = document.getElementById("settingsButton");
 const rotateCourtButton = document.getElementById("rotateCourtButton");
@@ -477,8 +475,6 @@ const oneDriveConnectionTitle = document.getElementById("oneDriveConnectionTitle
 const oneDriveConnectionDetail = document.getElementById("oneDriveConnectionDetail");
 const oneDriveClientIdInput = document.getElementById("oneDriveClientId");
 const oneDriveRedirectUriInput = document.getElementById("oneDriveRedirectUri");
-const connectOneDriveButton = document.getElementById("connectOneDriveButton");
-const disconnectOneDriveButton = document.getElementById("disconnectOneDriveButton");
 const oneDriveClientIdEditor = document.getElementById("oneDriveClientIdEditor");
 const changeOneDriveClientIdButton = document.getElementById("changeOneDriveClientIdButton");
 const resetOneDriveClientIdButton = document.getElementById("resetOneDriveClientIdButton");
@@ -5868,8 +5864,19 @@ function openAppSettings() {
   if (!settingsDialog.open) settingsDialog.showModal();
 }
 
+const connectionUi = window.ZeroOneConnection.create({
+  mount: '#zeroOneConnection', presentation: 'compact', connect: () => window.OneDriveStorage.signIn(),
+  retry: async () => { await window.OneDriveStorage.checkConnection(); if (!window.OneDriveStorage.isConnected()) await window.OneDriveStorage.signIn(); },
+  switchAccount: () => window.OneDriveStorage.signIn({ chooseAccount: true }),
+  signOut: async () => { if (window.confirm('この端末のOneDrive接続を解除しますか？ OneDrive上のデータは削除されません。')) await window.OneDriveStorage.signOut(); },
+  settings: openOneDriveSettings
+});
+
 // OneDriveの接続状態を画面へ反映します。
 function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.() || {}) {
+  connectionUi.update({ ...nextStatus, account: Boolean(nextStatus.username || nextStatus.account),
+    state: !nextStatus.configured ? 'error' : nextStatus.state || 'checking',
+    detail: !nextStatus.configured ? 'アプリの接続設定を確認してください。' : nextStatus.detail });
   const configured = Boolean(nextStatus.configured);
   const connected = Boolean(nextStatus.connected);
   const errorMessage = String(nextStatus.error || "");
@@ -5884,7 +5891,10 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
 
   oneDriveConnectionCard?.classList.toggle("connected", connected);
   oneDriveConnectionCard?.classList.toggle("error", Boolean(errorMessage));
-  if (connected) {
+  if (nextStatus.state === "auth") {
+    oneDriveConnectionTitle.textContent = "再接続が必要";
+    oneDriveConnectionDetail.textContent = "ツールバーの雲アイコン「再接続」を押してください。";
+  } else if (connected && nextStatus.state === "connected") {
     oneDriveConnectionTitle.textContent = "OneDriveへ接続済み";
     oneDriveConnectionDetail.textContent = `${accountLabel} の専用アプリフォルダへ作戦JSONと動画を保存します。`;
   } else if (errorMessage) {
@@ -5898,18 +5908,6 @@ function updateOneDriveInterface(nextStatus = window.OneDriveStorage?.status?.()
     oneDriveConnectionDetail.textContent = "Microsoft EntraのクライアントIDを設定してください。";
   }
 
-  if (oneDriveButton) {
-    const buttonHint = connected ? "OneDrive接続中・設定を開く" : "OneDrive設定を開く";
-    oneDriveButton.textContent = "☁";
-    oneDriveButton.setAttribute("aria-label", buttonHint);
-    oneDriveButton.title = buttonHint;
-    oneDriveButton.classList.toggle("connected", connected);
-  }
-  if (connectOneDriveButton) {
-    connectOneDriveButton.disabled = connected || !configured;
-    connectOneDriveButton.textContent = connected ? "接続済み" : "Microsoftアカウントで接続";
-  }
-  if (disconnectOneDriveButton) disconnectOneDriveButton.hidden = !connected;
   if (bulkBackupButton) bulkBackupButton.disabled = bulkTransferInProgress || !connected;
   if (bulkRestoreButton) bulkRestoreButton.disabled = bulkTransferInProgress || !connected;
   if (resetOneDriveClientIdButton) {
@@ -6344,8 +6342,8 @@ async function savePlayToLibrary() {
   if (window.OneDriveStorage?.isConfigured()) {
     if (!window.OneDriveStorage.isConnected()) {
       autosave();
-      openOneDriveSettings();
-      showToast("OneDriveへ接続してから、もう一度保存してください");
+      document.querySelector("#zeroOneConnection .zoc-primary")?.focus();
+      showToast("雲アイコンからOneDriveへ接続してから、もう一度保存してください");
       return;
     }
     try {
@@ -6640,7 +6638,8 @@ function removeLibraryCacheItem(item) {
 async function openLibrary() {
   // 公開版でOneDrive未接続の場合は、先に接続設定を案内します。
   if ((isHostedWebApp() || window.OneDriveStorage?.isConfigured()) && !window.OneDriveStorage?.isConnected()) {
-    openOneDriveSettings();
+    document.querySelector("#zeroOneConnection .zoc-primary")?.focus();
+    showToast("雲アイコンからOneDriveへ接続してください");
     return;
   }
   // 先にダイアログを開き、端末キャッシュを即時表示します。
@@ -7372,8 +7371,6 @@ document.getElementById("exportButton").addEventListener("click", exportPng);
 // 連続再生の動画出力ボタンを登録します。
 exportVideoButton?.addEventListener("click", exportPlaybackVideo);
 // OneDrive設定を開くボタンを登録します。
-if (connectFolderButton) connectFolderButton.addEventListener("click", openOneDriveSettings);
-if (oneDriveButton) oneDriveButton.addEventListener("click", openOneDriveSettings);
 document.getElementById("closeOneDriveButton")?.addEventListener("click", () => oneDriveDialog.close());
 // 歯車アイコンからアプリ設定を開閉します。
 settingsButton?.addEventListener("click", openAppSettings);
@@ -7431,23 +7428,6 @@ document.getElementById("copyOneDriveRedirectButton")?.addEventListener("click",
   showToast("リダイレクトURIをコピーしました");
 });
 
-// 個人用Microsoftアカウントへ接続します。
-connectOneDriveButton?.addEventListener("click", async () => {
-  try {
-    if (!window.OneDriveStorage.isConfigured()) {
-      oneDriveClientIdEditor.hidden = false;
-      oneDriveClientIdInput.focus();
-      window.alert("OneDriveの既定設定を読み込めませんでした。詳細設定からクライアントIDを確認してください。");
-      return;
-    }
-    await window.OneDriveStorage.signIn();
-    // 接続直後に端末側の保存フォルダ一覧もOneDriveと同期します。
-    await syncSaveFoldersFromOneDrive();
-  } catch (error) {
-    console.error("OneDriveへ接続できませんでした。", error);
-    window.alert("OneDriveへ接続できませんでした。\n\n" + error.message);
-  }
-});
 
 bulkBackupButton?.addEventListener("click", runBulkBackup);
 bulkRestoreButton?.addEventListener("click", () => {
@@ -7499,15 +7479,6 @@ guideDialog?.addEventListener("cancel", (event) => {
   completeGuide(true);
 });
 
-// 現在のMicrosoftアカウント接続を解除します。
-disconnectOneDriveButton?.addEventListener("click", async () => {
-  if (!window.confirm("この端末のOneDrive接続を解除しますか？\nOneDrive上の作戦データは削除されません。")) return;
-  try {
-    await window.OneDriveStorage.signOut();
-  } catch (error) {
-    window.alert("OneDrive接続を解除できませんでした。\n\n" + error.message);
-  }
-});
 
 if (refreshLibraryButton) refreshLibraryButton.addEventListener("click", () => renderLibrary({ forceRefresh: true }));
 // 検索・フォルダ・お気に入り切替は先読み済み一覧だけを絞り込み、OneDriveへ再通信しません。

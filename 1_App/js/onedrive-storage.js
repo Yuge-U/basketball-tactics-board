@@ -14,6 +14,7 @@ window.OneDriveStorage = (() => {
   let initPromise = null;
   let appRoot = null;
   let lastError = "";
+  let auth = null;
 
   class OneDriveError extends Error {
     constructor(code, message, cause) {
@@ -43,11 +44,12 @@ window.OneDriveStorage = (() => {
   }
 
   function isConnected() {
-    return Boolean(client && account);
+    return Boolean(client && account && !auth?.needsInteraction);
   }
 
   function status() {
     return {
+      ...(auth?.status() || { state: "checking", account: false }),
       configured: isConfigured(),
       connected: isConnected(),
       username: account?.username || "",
@@ -106,27 +108,14 @@ window.OneDriveStorage = (() => {
         throw new OneDriveError("https-required", "OneDrive連携はGitHub PagesなどのHTTPSページから利用してください。");
       }
 
-      client = new window.msal.PublicClientApplication({
-        auth: {
-          clientId: configuredClientId(),
-          authority: window.OneDriveConfig?.authority || "https://login.microsoftonline.com/consumers",
-          redirectUri: redirectUri(),
-          postLogoutRedirectUri: redirectUri(),
-          navigateToLoginRequestUrl: true
-        },
-        cache: {
-          cacheLocation: "localStorage"
-        },
-        system: {
-          allowPlatformBroker: false
-        }
+      auth = new window.ZeroOneConnection.Auth({
+        msal: window.msal, storage: localStorage, clientId: configuredClientId(),
+        authority: window.OneDriveConfig?.authority || "https://login.microsoftonline.com/consumers",
+        redirectUri: redirectUri(), accountKey: "zero-one-canvas-account"
       });
-
-      await client.initialize();
-      const response = await client.handleRedirectPromise();
-      account = response?.account || client.getActiveAccount() || client.getAllAccounts()[0] || null;
-      if (account) client.setActiveAccount(account);
-      lastError = "";
+      auth.subscribe(() => { account = auth.account; client = auth.client; lastError = auth.detail; emitStatus(); });
+      account = await auth.init(); client = auth.client;
+      lastError = auth.detail;
       emitStatus();
       return status();
     })().catch((error) => {
@@ -148,58 +137,25 @@ window.OneDriveStorage = (() => {
     return error?.message || "Microsoftアカウントへ接続できませんでした。";
   }
 
-  async function signIn() {
-    if (!isConfigured()) {
-      throw new OneDriveError("setup-required", "先にMicrosoft EntraのクライアントIDを設定してください。");
-    }
-    await init();
-    if (account) return status();
-    await client.loginRedirect({
-      scopes: SCOPES,
-      redirectUri: redirectUri(),
-      redirectStartPage: redirectUri(),
-      prompt: "select_account"
-    });
-    return new Promise(() => {});
+  async function signIn(options = {}) {
+    if (!isConfigured()) throw new OneDriveError("setup-required", "先にMicrosoft EntraのクライアントIDを設定してください。");
+    await init(); await auth.signIn(options); return status();
   }
-
-  async function signOut() {
-    await init();
-    if (!account) return;
-    await client.logoutRedirect({
-      account,
-      postLogoutRedirectUri: redirectUri()
-    });
-  }
-
-  async function accessToken() {
-    await init();
-    if (!account) {
-      throw new OneDriveError("not-signed-in", "OneDriveへ接続してください。");
-    }
-    try {
-      const result = await client.acquireTokenSilent({ scopes: SCOPES, account });
-      return result.accessToken;
-    } catch (error) {
-      if (error instanceof window.msal.InteractionRequiredAuthError || error?.name === "InteractionRequiredAuthError") {
-        await client.acquireTokenRedirect({
-          scopes: SCOPES,
-          account,
-          redirectUri: redirectUri(),
-          redirectStartPage: redirectUri()
-        });
-        return new Promise(() => {});
-      }
-      throw error;
-    }
-  }
+  async function signOut() { await init(); return auth?.signOut(); }
+  async function checkConnection() { await init(); return auth?.check(); }
+  async function accessToken(options = {}) { await init(); return auth.token(options); }
 
   async function graphRequest(path, options = {}, responseType = "json") {
-    const token = await accessToken();
+    let token = await accessToken();
     const headers = new Headers(options.headers || {});
     headers.set("Authorization", `Bearer ${token}`);
     const url = /^https:\/\//i.test(path) ? path : `${GRAPH_ROOT}${path}`;
-    const response = await fetch(url, { ...options, headers });
+    let response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+      token = await accessToken({ forceRefresh: true }); headers.set("Authorization", `Bearer ${token}`);
+      response = await fetch(url, { ...options, headers });
+      if (response.status === 401) throw auth.requireInteraction();
+    }
     if (!response.ok) {
       let details = {};
       try {
@@ -530,6 +486,7 @@ window.OneDriveStorage = (() => {
     init,
     signIn,
     signOut,
+    checkConnection,
     save,
     saveFolderSettings,
     loadFolderSettings,
