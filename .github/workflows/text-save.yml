@@ -1,0 +1,61 @@
+name: CANVAS text and save verification
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['pages build and deployment']
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    if: github.event_name != 'workflow_run'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - run: node --test tests/*.test.cjs
+      - run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.63.0
+      - run: npx playwright install --with-deps chromium webkit
+      - run: node tests/connection-hub.browser.cjs
+      - run: node tests/text-save.browser.cjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: canvas-text-save-${{ matrix.os }}
+          path: reports/text-save
+  live:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SITE_URL: https://yuge-u.github.io/basketball-tactics-board/
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.16.0'
+      - run: node scripts/check-text-save-public.mjs
+      - run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.63.0
+      - run: npx playwright install --with-deps chromium webkit
+      - run: node tests/text-save.browser.cjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: canvas-text-save-live
+          path: reports/text-save

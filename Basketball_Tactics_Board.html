@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./safari-canvas-192-20261007j.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-zero-one-180-20261007m.png">
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=49" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=51" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
 <link rel="stylesheet" href="./zero-one-connection.css?v=20261008-login2">
@@ -519,6 +519,22 @@
     <input id="videoImportInput" type="file" accept="video/*" hidden />
   </main>
 
+  <!-- 全画面表示でも使えるコート文字の入力欄です。 -->
+  <dialog id="courtTextDialog" class="library-dialog court-text-dialog" aria-labelledby="courtTextTitle">
+    <form id="courtTextForm">
+      <div class="dialog-header"><h2 id="courtTextTitle">テキストを追加</h2></div>
+      <div class="court-text-content">
+        <label for="courtTextInput">コートに表示する文字</label>
+        <input id="courtTextInput" type="text" autocomplete="off" autofocus />
+        <div class="court-text-actions">
+          <button id="cancelCourtTextButton" class="button" type="button">キャンセル</button>
+          <button id="applyCourtTextButton" class="button primary" type="submit">決定</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+  <div id="saveProgress" class="save-progress" role="status" aria-live="polite" hidden>保存中…</div>
+
   <!-- 保存済み作戦一覧のダイアログです。 -->
   <dialog id="libraryDialog" class="library-dialog">
     <!-- ダイアログの上部です。 -->
@@ -788,6 +804,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=45"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=51"></script>
+  <script defer src="./1_App/js/app.js?v=54"></script>
 </body>
 </html>
