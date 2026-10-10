@@ -906,6 +906,10 @@ let playbackFrame = null;
 let playbackVisual = null;
 // 再生処理を識別して安全に中断する番号を保持します。
 let playbackRunId = 0;
+// 一時停止は表示位置を保持し、既存の再生処理の時計だけを止めます。
+let playbackPausedAt = null;
+let playbackPausedDuration = 0;
+const playbackCancellations = new Set();
 // 動画録画中のMediaRecorderを保持します。
 let activeVideoRecorder = null;
 // Toastを消すタイマーを保持します。
@@ -916,6 +920,10 @@ let autosaveWarningShown = false;
 let viewport = { scale: 1, offsetX: 0, offsetY: 0, cssWidth: 1, cssHeight: 1 };
 // コートだけを最大表示しているかを保持します。
 let isFocusMode = false;
+// コーチングの表示設定は作戦JSONやUndo履歴へ含めません。
+let isCoachingMode = false;
+let coachingReturnView = null;
+let shortcutCompositionActive = false;
 // 最大表示中の編集パネルを開いているか保持します。
 let isFocusEditorOpen = false;
 // 最大表示中の再生設定パネルを開いているか保持します。
@@ -2735,6 +2743,29 @@ function drawMediaItem(ctx, mediaItem) {
 
 // 選択中素材へ移動・拡大縮小・回転用の枠とハンドルを描きます。
 function drawCanvasItemSelection(ctx) {
+  if (selectedCanvasItem && !["text", "media"].includes(selectedCanvasItem.type)
+      && state.activeTool === "select" && !playbackTimer) {
+    const step = getActiveStep();
+    const collections = { player: step.players, ball: getStepBalls(step), cone: step.cones, line: step.lines };
+    const selected = collections[selectedCanvasItem.type]?.find((item) => item.id === selectedCanvasItem.id);
+    if (!selected) return;
+    ctx.save();
+    ctx.strokeStyle = "#2563eb";
+    ctx.lineWidth = 2 / Math.max(0.01, viewport.scale);
+    ctx.setLineDash([7 / viewport.scale, 5 / viewport.scale]);
+    ctx.beginPath();
+    if (selectedCanvasItem.type === "line") {
+      const points = selected.points?.length >= 2 ? selected.points : [selected.start, selected.end];
+      points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+    } else {
+      const radius = selectedCanvasItem.type === "player" ? getPlayerRadius()
+        : selectedCanvasItem.type === "ball" ? getBallRadius() : CONE_WIDTH;
+      ctx.arc(selected.x, selected.y, radius + 6 / viewport.scale, 0, Math.PI * 2);
+    }
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   const item = getSelectedCanvasItem();
   if (!item || !selectedCanvasItem || state.activeTool !== "select" || playbackTimer) {
     return;
@@ -3441,8 +3472,8 @@ function handlePointerDown(event) {
     const target = transform ? { ...selectedCanvasItem } : findDraggableAt(rawPoint);
     // 対象がある場合だけドラッグを開始します。
     if (target) {
-      // テキスト・画像・動画は選択枠を表示します。
-      selectedCanvasItem = target.type === "text" || target.type === "media" ? { ...target } : null;
+      // Deleteの対象を保持し、選択枠を表示します。
+      selectedCanvasItem = { ...target };
       // 現在の素材データを取得します。
       const canvasItem = getSelectedCanvasItem(target);
       // 選択したテキストのフォントを設定欄へ反映します。
@@ -3484,74 +3515,24 @@ function handlePointerDown(event) {
       // 選手を押した直後から選択色が見えるよう再描画します。
       render();
     } else {
-      // 空白を押した場合は素材選択を解除します。
-      selectedCanvasItem = null;
+      // 戦術線は選択だけを行い、従来のドラッグ操作は変更しません。
+      const line = findLineAt(rawPoint);
+      selectedCanvasItem = line ? { type: "line", id: line.id } : null;
       render();
     }
     // 選択ツール処理を終了します。
     return;
   }
-  // 消去ツールの場合を処理します。
+  // 既存のヒット判定の優先順位で、Deleteと共通の削除処理を呼び出します。
   if (state.activeTool === "erase") {
-    // 位置にあるテキストを探します。
-    const textItem = findTextAt(rawPoint);
-    // テキストがある場合は優先して削除します。
-    if (textItem) {
-      // 履歴付きでテキストを削除します。
-      commitMutation(() => {
-        // 現在のSTEPを取得します。
-        const step = getActiveStep();
-        // 対象以外のテキストを残します。
-        step.texts = step.texts.filter((item) => item.id !== textItem.id);
-      });
-      // 削除結果を通知します。
-      showToast("テキストを削除しました");
-      // 消去ツール処理を終了します。
-      return;
+    const candidates = [["text", findTextAt], ["media", findMediaAt], ["cone", findConeAt], ["line", findLineAt]];
+    for (const [type, find] of candidates) {
+      const item = find(rawPoint);
+      if (item) {
+        deleteCanvasObject({ type, id: item.id });
+        break;
+      }
     }
-    // 位置にある画像・動画を探します。
-    const mediaItem = findMediaAt(rawPoint);
-    // 画像・動画がある場合は優先して削除します。
-    if (mediaItem) {
-      commitMutation(() => {
-        const step = getActiveStep();
-        step.media = step.media.filter((item) => item.id !== mediaItem.id);
-      });
-      selectedCanvasItem = null;
-      showToast(mediaItem.type === "video" ? "動画を削除しました" : "画像を削除しました");
-      return;
-    }
-    // 位置にあるコーンを探します。
-    const cone = findConeAt(rawPoint);
-    // コーンがある場合は優先して削除します。
-    if (cone) {
-      // 履歴付きでコーンを削除します。
-      commitMutation(() => {
-        // 現在STEPを取得します。
-        const step = getActiveStep();
-        // 対象以外のコーンを残します。
-        step.cones = step.cones.filter((item) => item.id !== cone.id);
-      });
-      // 削除結果を通知します。
-      showToast("コーンを削除しました");
-      // 消去ツール処理を終了します。
-      return;
-    }
-    // 位置に近い線を探します。
-    const line = findLineAt(rawPoint);
-    // 線がある場合だけ削除します。
-    if (line) {
-      // 履歴付きで線を削除します。
-      commitMutation(() => {
-        // 現在のSTEPを取得します。
-        const step = getActiveStep();
-        // 対象線以外を残します。
-        step.lines = step.lines.filter((item) => item.id !== line.id);
-      });
-      // 削除結果を通知します。
-      showToast("線を削除しました");
-    }
-    // 消去ツール処理を終了します。
     return;
   }
   // テキストツールの場合は押した場所へ文字を追加します。
@@ -4152,7 +4133,7 @@ function syncFocusPlaybackSettings() {
 }
 
 // コートだけの最大表示を切り替えます。
-function setFocusMode(enabled) {
+function setFocusMode(enabled, useFullscreen = true) {
   // 最大表示状態を保存します。
   isFocusMode = Boolean(enabled);
   // 最大表示へ入る時も戻る時も編集パネルを一度閉じます。
@@ -4166,7 +4147,7 @@ function setFocusMode(enabled) {
     // 最大表示へ入るたび、STEP一覧を標準の非表示へ戻します。
     state.focusShowSteps = false;
     // ブラウザーが対応していれば全画面表示も試します。
-    document.documentElement.requestFullscreen?.().catch(() => undefined);
+    if (useFullscreen) document.documentElement.requestFullscreen?.().catch(() => undefined);
   } else if (document.fullscreenElement) {
     // 全画面表示中なら解除します。
     document.exitFullscreen?.().catch(() => undefined);
@@ -4175,6 +4156,41 @@ function setFocusMode(enabled) {
   syncFocusVisibility();
   // レイアウト反映後にCanvasサイズを再計算します。
   window.setTimeout(resizeCanvas, 40);
+}
+
+// 既存の最大表示を利用し、Cで元のパネル・スクロール状態へ戻します。
+function setCoachingMode(enabled) {
+  if (Boolean(enabled) === isCoachingMode) return;
+  cancelCanvasOperation();
+  if (enabled) {
+    coachingReturnView = {
+      focus: isFocusMode, editor: isFocusEditorOpen,
+      settings: isFocusPlaybackSettingsOpen, steps: state.focusShowSteps,
+      scrollX: window.scrollX, scrollY: window.scrollY,
+      activeElement: document.activeElement
+    };
+    isCoachingMode = true;
+    document.body.classList.add("coaching-mode");
+    // ブラウザー全画面を要求せず、Escを再生終了・操作取消に使えます。
+    setFocusMode(true, false);
+    canvas.focus({ preventScroll: true });
+  } else {
+    const previous = coachingReturnView;
+    isCoachingMode = false;
+    document.body.classList.remove("coaching-mode");
+    setFocusMode(previous?.focus ?? false, false);
+    state.focusShowSteps = previous?.steps ?? false;
+    setFocusEditorOpen(previous?.editor ?? false);
+    setFocusPlaybackSettingsOpen(previous?.settings ?? false);
+    syncFocusVisibility();
+    window.setTimeout(() => {
+      resizeCanvas();
+      window.scrollTo(previous?.scrollX ?? 0, previous?.scrollY ?? 0);
+      previous?.activeElement?.focus({ preventScroll: true });
+    }, 40);
+    coachingReturnView = null;
+  }
+  showToast(isCoachingMode ? "コーチングモード · Cで編集画面へ · ?で操作一覧" : "元の表示へ戻りました");
 }
 
 // ツールを切り替えます。
@@ -4491,7 +4507,7 @@ function getDefaultBallPosition(index) {
 }
 
 // 現在STEPのボールを1個ずつ増減します。主ボールは互換性のため必ず残します。
-function adjustBallCount(change) {
+function adjustBallCount(change, targetId = null) {
   clearPlaybackPreview();
   const step = getActiveStep();
   const balls = getStepBalls(step);
@@ -4518,7 +4534,12 @@ function adjustBallCount(change) {
     showToast("ボールは最低1個必要です");
     return;
   }
-  const target = balls[balls.length - 1];
+  const target = targetId ? balls.find((ball) => ball.id === targetId) : balls[balls.length - 1];
+  if (!target) return;
+  if (target.id === balls[0].id) {
+    showToast("主ボールは削除できません");
+    return;
+  }
   commitMutation(() => {
     step.balls = getStepBalls(step).filter((ball) => ball.id !== target.id);
     // 削除ボールに結び付くパス・ドリブルだけを同時に削除します。
@@ -5071,6 +5092,7 @@ async function stepPlaybackForward() {
   const runId = playbackRunId;
   // 再生中フラグを設定します。
   playbackTimer = runId;
+  resetPlaybackClock();
   // 再生ボタン表示を停止へ変更します。
   updatePlayButtonLabels("■ 停止");
   // 現在配置を表示します。
@@ -5168,6 +5190,7 @@ async function playSteps() {
   const runId = playbackRunId;
   // 再生中フラグとして番号を保存します。
   playbackTimer = runId;
+  resetPlaybackClock();
   // 再生ボタン表示を変更します。
   updatePlayButtonLabels("■ 停止");
   // 全STEPを順番に再生します。
@@ -5376,23 +5399,33 @@ async function animateBallSequenceActions(lines, ballId, step, playerPositions, 
 function animateSingleAction(path, duration, runId, onFrame) {
   // アニメーション完了を待つPromiseを返します。
   return new Promise((resolve) => {
+    let frameId = null;
+    const finish = () => {
+      window.cancelAnimationFrame(frameId);
+      playbackCancellations.delete(finish);
+      resolve();
+    };
+    playbackCancellations.add(finish);
     // 開始時刻を未設定で保持します。
     let startedAt = null;
     // 1フレーム分の処理を定義します。
-    const frame = (timestamp) => {
+    const frame = () => {
       // 再生が停止されていたら完了します。
       if (playbackTimer !== runId) {
-        // 再生用表示を消します。
-        playbackVisual = null;
         // Promiseを完了します。
-        resolve();
+        finish();
         // フレーム処理を終了します。
         return;
       }
       // 初回時刻を開始時刻として保存します。
-      startedAt ??= timestamp;
+      const now = getPlaybackTime();
+      startedAt ??= now;
+      if (playbackPausedAt !== null) {
+        frameId = playbackFrame = window.requestAnimationFrame(frame);
+        return;
+      }
       // 0から1の進行度を計算します。
-      const rawProgress = Math.min(1, (timestamp - startedAt) / duration);
+      const rawProgress = Math.min(1, (now - startedAt) / duration);
       // 動きが自然になるように緩急を付けます。
       const progress = easeInOut(rawProgress);
       // 軌道上の現在位置を取得します。
@@ -5406,15 +5439,15 @@ function animateSingleAction(path, duration, runId, onFrame) {
         // フレームIDを空にします。
         playbackFrame = null;
         // Promiseを完了します。
-        resolve();
+        finish();
         // 処理を終了します。
         return;
       }
       // 次のフレームを予約します。
-      playbackFrame = window.requestAnimationFrame(frame);
+      frameId = playbackFrame = window.requestAnimationFrame(frame);
     };
     // 最初のフレームを予約します。
-    playbackFrame = window.requestAnimationFrame(frame);
+    frameId = playbackFrame = window.requestAnimationFrame(frame);
   });
 }
 
@@ -5484,7 +5517,7 @@ function waitForPlayback(milliseconds, runId) {
   // 待機完了を返すPromiseを作ります。
   return new Promise((resolve) => {
     // 一定間隔で再生状態を確認します。
-    const startedAt = performance.now();
+    const startedAt = getPlaybackTime();
     // 確認処理を定義します。
     const check = () => {
       // 再生が停止されたら即座に完了します。
@@ -5493,7 +5526,7 @@ function waitForPlayback(milliseconds, runId) {
         return;
       }
       // 指定時間を超えたら完了します。
-      if (performance.now() - startedAt >= adjustedMilliseconds) {
+      if (playbackPausedAt === null && getPlaybackTime() - startedAt >= adjustedMilliseconds) {
         resolve();
         return;
       }
@@ -5505,8 +5538,39 @@ function waitForPlayback(milliseconds, runId) {
   });
 }
 
+function resetPlaybackClock() {
+  playbackPausedAt = null;
+  playbackPausedDuration = 0;
+}
+
+function getPlaybackTime() {
+  return (playbackPausedAt ?? performance.now()) - playbackPausedDuration;
+}
+
+function togglePlaybackPause() {
+  if (!playbackTimer) {
+    playSteps();
+    return;
+  }
+  if (playbackPausedAt === null) {
+    playbackPausedAt = performance.now();
+    updatePlayButtonLabels("▶ 再生");
+    showToast("一時停止 · Spaceで再開");
+  } else {
+    playbackPausedDuration += performance.now() - playbackPausedAt;
+    playbackPausedAt = null;
+    updatePlayButtonLabels("■ 停止");
+  }
+}
+
+function cancelPlaybackAnimations() {
+  playbackCancellations.forEach((cancel) => cancel());
+  resetPlaybackClock();
+}
+
 // 再生終了時に最終位置を表示したまま停止します。
 function finishPlaybackAtEnd() {
+  cancelPlaybackAnimations();
   // 再生番号を更新して今回の処理を終了扱いにします。
   playbackRunId += 1;
   // 再生中フラグを空にします。
@@ -5546,6 +5610,7 @@ function clearPlaybackPreview() {
 
 // STEP再生を停止します。
 function stopPlayback(showMessage = true) {
+  cancelPlaybackAnimations();
   // 再生番号を更新して進行中処理を無効化します。
   playbackRunId += 1;
   // 再生中フラグを空にします。
@@ -7212,36 +7277,104 @@ function showToast(message) {
   }, 1900);
 }
 
-// キーボード操作を処理します。
+// Escapeで未確定の描画を捨て、ドラッグは開始前の状態へ戻します。
+function cancelCanvasOperation() {
+  const before = dragSession?.moved ? dragSession.before : null;
+  const pointerId = dragSession?.pointerId ?? drawSession?.pointerId;
+  dragSession = null;
+  drawSession = null;
+  if (pointerId !== undefined && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
+  if (before) applySnapshot(before);
+  render();
+}
+
+// 消去ツールとDeleteの両方で同じ履歴付き削除処理を使います。
+function deleteCanvasObject(target) {
+  if (!target) return;
+  const step = getActiveStep();
+  if (target.type === "player") {
+    const player = step.players.find((item) => item.id === target.id);
+    if (player) togglePlayerNumber(player.side, player.label);
+  } else if (target.type === "ball") {
+    adjustBallCount(-1, target.id);
+  } else {
+    const collection = { text: "texts", media: "media", cone: "cones", line: "lines" }[target.type];
+    const item = collection && step[collection].find((item) => item.id === target.id);
+    if (!item) return;
+    const label = { text: "テキスト", media: item.type === "video" ? "動画" : "画像", cone: "コーン", line: "線" }[target.type];
+    commitMutation(() => { step[collection] = step[collection].filter((item) => item.id !== target.id); });
+    showToast(`${label}を削除しました`);
+  }
+  selectedCanvasItem = null;
+  render();
+}
+
+function isShortcutInput(element) {
+  return Boolean(element?.isContentEditable
+    || element?.closest?.("input, textarea, select, [role='textbox'], [contenteditable=''], [contenteditable='true'], [contenteditable='plaintext-only']"));
+}
+
+function toggleShortcutGuide() {
+  const guide = document.getElementById("shortcutGuide");
+  guide.hidden = !guide.hidden;
+  document.getElementById("shortcutGuideButton").setAttribute("aria-expanded", String(!guide.hidden));
+}
+
+// キーボード操作はこの一つのリスナーに集約し、既存処理を呼び出します。
 function handleKeyDown(event) {
-  // 入力欄操作中かどうかを判定します。
-  const isTyping = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
-  // 日本語変換と入力欄のUndoはブラウザーへ任せます。
-  if (isTyping || event.isComposing || courtTextDialog.open) return;
-  // 入力中は数字キーによるツール切替を行いません。
-  if (!isTyping) {
-    // 数字キーとツールの対応を定義します。
-    const keyMap = { "1": "select", "2": "move", "3": "pass", "4": "dribbleFree", "5": "dribbleStraight", "6": "screenFree", "7": "screenStraight", "8": "free", "9": "erase", "0": "text" };
-    // 対応ツールがある場合は切り替えます。
-    if (keyMap[event.key]) {
-      // ツールを切り替えます。
-      setTool(keyMap[event.key]);
-    }
+  if (event.defaultPrevented || event.isComposing || shortcutCompositionActive || event.keyCode === 229) return;
+  if (isShortcutInput(document.activeElement) || (event.composedPath?.() ?? [event.target]).some(isShortcutInput)) return;
+  // 初回ガイド・保存先・文字入力・接続設定を含むダイアログを優先します。
+  if (document.querySelector("dialog[open], [aria-modal='true']")) return;
+  if (event.altKey || (event.ctrlKey && event.metaKey) || event.getModifierState?.("AltGraph")) return;
+  const key = event.key.toLowerCase();
+  const command = event.ctrlKey || event.metaKey;
+  let action = null;
+  if (command) {
+    if (key === "z") action = event.shiftKey ? redo : undo;
+    else if (key === "y" && !event.shiftKey) action = redo;
+    else if (key === "s" && !event.shiftKey) action = savePlayToLibrary;
+  } else if (key === "?") {
+    action = toggleShortcutGuide;
+  } else if (key === "arrowright" || key === "arrowleft") {
+    action = () => {
+      const index = state.steps.findIndex((step) => step.id === state.activeStepId);
+      const next = event.shiftKey ? (key === "arrowright" ? state.steps.length - 1 : 0)
+        : Math.max(0, Math.min(state.steps.length - 1, index + (key === "arrowright" ? 1 : -1)));
+      selectStep(state.steps[next].id);
+    };
+  } else if (key === "+" || (key === "-" && !event.shiftKey)) {
+    action = () => {
+      playbackSpeedRange.value = String(normalizeSpeed(state.playbackSpeed + (key === "+" ? 0.25 : -0.25)));
+      playbackSpeedRange.dispatchEvent(new Event("input"));
+      showToast(`再生速度 ${state.playbackSpeed.toFixed(2)}×`);
+    };
+  } else if (!event.shiftKey) {
+    const keyMap = { v: "select", m: "move", d: "dribbleFree", p: "pass", s: "screenFree", t: "text",
+      "1": "select", "2": "move", "3": "pass", "4": "dribbleFree", "5": "dribbleStraight",
+      "6": "screenFree", "7": "screenStraight", "8": "free", "9": "erase", "0": "text" };
+    if (keyMap[key]) action = () => { if (!playbackTimer) { setTool(keyMap[key]); render(); } };
+    else if (key === " ") action = togglePlaybackPause;
+    else if (key === "r") action = () => { stopPlayback(false); selectStep(state.steps[0].id); playSteps(); };
+    else if (key === "c") action = () => setCoachingMode(!isCoachingMode);
+    else if (key === "delete" || key === "backspace") action = () => { if (!playbackTimer) deleteCanvasObject(selectedCanvasItem); };
+    else if (key === "escape") action = () => {
+      document.getElementById("shortcutGuide").hidden = true;
+      document.getElementById("shortcutGuideButton").setAttribute("aria-expanded", "false");
+      stopPlayback(false);
+      cancelCanvasOperation();
+      selectedCanvasItem = null;
+      setTool("select");
+      render();
+    };
   }
-  // CtrlまたはCommandとZで元に戻します。
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && !event.shiftKey) {
-    // ブラウザー標準動作を止めます。
-    event.preventDefault();
-    // 元に戻します。
-    undo();
-  }
-  // CtrlまたはCommandとYでやり直します。
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
-    // ブラウザー標準動作を止めます。
-    event.preventDefault();
-    // やり直します。
-    redo();
-  }
+  if (!action) return;
+  // 長押しでもブラウザーのスクロールやボタンのSpaceクリックを抑止します。
+  event.preventDefault();
+  if (event.repeat || activeVideoRecorder) return;
+  if ((dragSession || drawSession) && key !== "escape" && key !== "c") return;
+  if (command && playbackTimer) stopPlayback(false);
+  action();
 }
 
 // ツールボタンへイベントを登録します。
@@ -7354,6 +7487,11 @@ canvas.addEventListener("dblclick", handleCanvasDoubleClick);
 window.addEventListener("resize", resizeCanvas);
 // キーボード操作を登録します。
 window.addEventListener("keydown", handleKeyDown);
+window.addEventListener("compositionstart", () => { shortcutCompositionActive = true; });
+window.addEventListener("compositionend", () => { shortcutCompositionActive = false; });
+window.addEventListener("blur", () => { shortcutCompositionActive = false; });
+document.getElementById("shortcutGuideButton")?.addEventListener("click", toggleShortcutGuide);
+document.getElementById("closeShortcutGuideButton")?.addEventListener("click", toggleShortcutGuide);
 
 // 通常画面と最大表示設定のコート切替ボタンを登録します。
 document.querySelectorAll("[data-court-mode]").forEach((button) => {
@@ -7370,7 +7508,7 @@ document.getElementById("maximizeCourtButton").addEventListener("click", () => s
 // 通常表示のコート回転ボタンを登録します。
 rotateCourtButton?.addEventListener("click", rotateCourtAndPlay);
 // 最大表示終了ボタンを登録します。
-document.getElementById("exitFocusButton").addEventListener("click", () => setFocusMode(false));
+document.getElementById("exitFocusButton").addEventListener("click", () => isCoachingMode ? setCoachingMode(false) : setFocusMode(false));
 // 最大表示のコート回転ボタンを登録します。
 focusRotateCourtButton?.addEventListener("click", rotateCourtAndPlay);
 // 最大表示用の再生ボタンを登録します。
@@ -7622,7 +7760,7 @@ showMovementLinesToggle.addEventListener("change", () => {
 // Escなどでブラウザー全画面が解除された場合を同期します。
 document.addEventListener("fullscreenchange", () => {
   // 全画面要素がなくなり最大表示中なら通常表示へ戻します。
-  if (!document.fullscreenElement && isFocusMode) {
+  if (!document.fullscreenElement && isFocusMode && !isCoachingMode) {
     // 状態だけを通常表示へ戻します。
     isFocusMode = false;
     // 最大表示クラスを外します。
