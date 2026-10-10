@@ -173,7 +173,7 @@ const DEFAULT_SAVE_FOLDERS = Object.freeze([
   "U15/Practice"
 ]);
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v44";
+const APP_VERSION = "v45";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -1721,9 +1721,11 @@ function resizeCanvas() {
   // 高解像度画面の倍率を取得します。
   const pixelRatio = Math.max(1, window.devicePixelRatio || 1);
   // Canvas内部幅を設定します。
-  canvas.width = Math.round(rect.width * pixelRatio);
+  const nextWidth = Math.round(rect.width * pixelRatio);
+  if (canvas.width !== nextWidth) canvas.width = nextWidth;
   // Canvas内部高さを設定します。
-  canvas.height = Math.round(rect.height * pixelRatio);
+  const nextHeight = Math.round(rect.height * pixelRatio);
+  if (canvas.height !== nextHeight) canvas.height = nextHeight;
   // CanvasのCSS幅を設定します。
   canvas.style.width = `${rect.width}px`;
   // CanvasのCSS高さを設定します。
@@ -3554,10 +3556,11 @@ function handlePointerDown(event) {
   }
   // テキストツールの場合は押した場所へ文字を追加します。
   if (state.activeTool === "text") {
-    // 配置する文字を入力してもらいます。
-    const enteredText = window.prompt("コートに置くテキストを入力してください。", "");
-    // キャンセルまたは空文字の場合は追加しません。
-    if (enteredText !== null && enteredText.trim()) {
+    // 入力を始める前にPointerを解放し、全画面内の入力欄を使います。
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    const stepId = state.activeStepId;
+    openCourtTextDialog("", (enteredText) => {
+      if (state.activeStepId !== stepId) return;
       // 新しいテキストデータを仮作成します。
       const textItem = { id: makeId("text"), text: enteredText.trim(), x: rawPoint.x, y: rawPoint.y, color: state.activeLineColor, font: normalizeTextFont(state.activeTextFont), outline: state.activeTextOutline !== false, fontSize: TEXT_FONT_SIZE, scale: 1, rotation: 0 };
       // テキスト全体がコート内へ収まる位置を計算します。
@@ -3576,12 +3579,7 @@ function handlePointerDown(event) {
       setTool("select");
       // 追加結果を通知します。
       showToast("テキストを追加しました");
-    }
-    // Pointerキャプチャを安全に解除します。
-    if (canvas.hasPointerCapture(event.pointerId)) {
-      // Pointerキャプチャを解除します。
-      canvas.releasePointerCapture(event.pointerId);
-    }
+    });
     // テキストツール処理を終了します。
     return;
   }
@@ -3656,27 +3654,63 @@ function handleCanvasDoubleClick(event) {
     // 処理を終了します。
     return;
   }
-  // 現在文字を初期値として編集内容を入力してもらいます。
-  const editedText = window.prompt("テキストを編集してください。", textItem.text);
-  // キャンセルまたは空文字の場合は変更しません。
-  if (editedText === null || !editedText.trim()) {
-    // 処理を終了します。
-    return;
-  }
-  // 履歴付きでテキスト内容を更新します。
-  commitMutation(() => {
-    // 新しい文字列を保存します。
-    textItem.text = editedText.trim();
-    // 文字幅変更後もコート内へ収めます。
-    const next = clampTextPosition(textItem, textItem);
-    // X位置を補正します。
-    textItem.x = next.x;
-    // Y位置を補正します。
-    textItem.y = next.y;
-  });
-  // 編集結果を通知します。
-  showToast("テキストを変更しました");
+  // 現在文字を全画面内の入力欄で編集します。
+  openCourtTextDialog(textItem.text, (editedText) => {
+    if (!getActiveStep().texts.includes(textItem)) return;
+    // 履歴付きでテキスト内容を更新します。
+    commitMutation(() => {
+      // 新しい文字列を保存します。
+      textItem.text = editedText.trim();
+      // 文字幅変更後もコート内へ収めます。
+      const next = clampTextPosition(textItem, textItem);
+      // X位置を補正します。
+      textItem.x = next.x;
+      // Y位置を補正します。
+      textItem.y = next.y;
+    });
+    // 編集結果を通知します。
+    showToast("テキストを変更しました");
+  }, true);
 }
+
+// ブラウザー標準promptを使わず、全画面表示を保ったまま入力します。
+const courtTextDialog = document.getElementById("courtTextDialog");
+const courtTextInput = document.getElementById("courtTextInput");
+let courtTextSubmit = null;
+let courtTextComposing = false;
+function openCourtTextDialog(value, apply, editing = false) {
+  if (courtTextDialog.open) return;
+  courtTextSubmit = apply;
+  courtTextComposing = false;
+  courtTextInput.value = value;
+  document.getElementById("courtTextTitle").textContent = editing ? "テキストを編集" : "テキストを追加";
+  courtTextDialog.showModal();
+  courtTextInput.focus();
+  courtTextInput.select();
+}
+courtTextInput.addEventListener("compositionstart", () => { courtTextComposing = true; });
+courtTextInput.addEventListener("compositionend", () => { courtTextComposing = false; });
+courtTextInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (courtTextComposing || event.isComposing)) event.preventDefault();
+});
+courtTextDialog.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !courtTextComposing && !event.isComposing) {
+    event.preventDefault();
+    event.stopPropagation();
+    courtTextDialog.close();
+  }
+});
+document.getElementById("courtTextForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (courtTextComposing) return;
+  const value = courtTextInput.value.trim();
+  const apply = courtTextSubmit;
+  courtTextSubmit = null;
+  courtTextDialog.close();
+  if (value) apply?.(value);
+});
+document.getElementById("cancelCourtTextButton").addEventListener("click", () => courtTextDialog.close());
+courtTextDialog.addEventListener("close", () => { courtTextSubmit = null; courtTextComposing = false; });
 
 // Pointer移動を処理します。
 function handlePointerMove(event) {
@@ -6331,8 +6365,30 @@ async function requestFolderApi(path, options = {}) {
   return result;
 }
 
-// 現在作戦を2_Play_Dataへ保存します。
+// 保存が終わるまで表示を残し、連打による重複書込みを防ぎます。
+let playSaveInProgress = false;
 async function savePlayToLibrary() {
+  if (playSaveInProgress) return;
+  playSaveInProgress = true;
+  const button = document.getElementById("savePlayButton");
+  const progress = document.getElementById("saveProgress");
+  button.disabled = true;
+  button.setAttribute("aria-busy", "true");
+  button.setAttribute("aria-label", "保存中…");
+  progress.hidden = false;
+  try {
+    await performPlaySave();
+  } finally {
+    playSaveInProgress = false;
+    progress.hidden = true;
+    button.disabled = false;
+    button.setAttribute("aria-busy", "false");
+    button.setAttribute("aria-label", "作戦を保存");
+  }
+}
+
+// 既存のOneDrive・選択フォルダ・端末内の保存処理です。
+async function performPlaySave() {
   // 入力欄から作戦名を取得します。
   const name = playNameInput.value.trim() || "名称未設定の作戦";
   // 利用者が選択した保存フォルダを取得します。
@@ -7157,6 +7213,8 @@ function showToast(message) {
 function handleKeyDown(event) {
   // 入力欄操作中かどうかを判定します。
   const isTyping = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
+  // 日本語変換と入力欄のUndoはブラウザーへ任せます。
+  if (isTyping || event.isComposing || courtTextDialog.open) return;
   // 入力中は数字キーによるツール切替を行いません。
   if (!isTyping) {
     // 数字キーとツールの対応を定義します。
