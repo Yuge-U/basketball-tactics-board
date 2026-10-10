@@ -131,6 +131,10 @@ async function courtPoint(page, item) {
     await check(label,'T17 normal view uses the same text entry and preserves existing text',async()=>{assert.deepEqual(await page.evaluate(()=>getActiveStep().texts.map(t=>t.text)),['スクリーン 123','通常画面の文字']);});
     await page.locator('#addStepButton').click();await page.locator('#previousFrameButton').click();await page.locator('#nextFrameButton').click();
     await check(label,'T18 step copy and frame controls retain text',async()=>{assert.equal(await page.evaluate(()=>state.steps.length),2);assert.deepEqual(await page.evaluate(()=>getActiveStep().texts.map(t=>t.text)),['スクリーン 123','通常画面の文字']);assert.equal(await page.evaluate(()=>localStorage.getItem('synthetic-auth-preserve')),'unchanged');});
+    const racePoint=await courtPoint(page,await page.evaluate(()=>({...getActiveStep().texts[0]})));
+    await page.evaluate(async p=>{const closed=new Promise(resolve=>courtTextDialog.addEventListener('close',resolve,{once:true}));const edit=()=>canvas.dispatchEvent(new MouseEvent('dblclick',{clientX:p.x,clientY:p.y,bubbles:true}));edit();courtTextDialog.close();edit();await closed;},racePoint);
+    await input.fill('開き直した入力');await page.locator('#applyCourtTextButton').click();
+    await check(label,'T19 delayed close does not discard a reopened text edit',async()=>{assert.equal(await page.evaluate(()=>getActiveStep().texts[0].text),'開き直した入力');assert.equal(await page.evaluate(()=>state.steps[0].texts[0].text),'スクリーン 123');});
     await page.screenshot({path:path.join(root,'reports','text-save',label.replaceAll(' ','-')+'.png'),fullPage:true});
    } catch(e) {const diagnostics=await page.evaluate(()=>({active:document.activeElement?.id,fullscreen:document.fullscreenElement?.tagName,focus:isFocusMode,dialog:document.getElementById('courtTextDialog')?.open,composing:courtTextComposing,keys:textKeyEvents.slice(-6)})).catch(()=>null);errors.push({label,message:e.stack,diagnostics});console.error('FAIL',label,e.message,JSON.stringify(diagnostics));} finally {await context.close();}
   } } finally {await browser.close();}

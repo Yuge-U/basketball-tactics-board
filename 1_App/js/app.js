@@ -3710,7 +3710,10 @@ document.getElementById("courtTextForm").addEventListener("submit", (event) => {
   if (value) apply?.(value);
 });
 document.getElementById("cancelCourtTextButton").addEventListener("click", () => courtTextDialog.close());
-courtTextDialog.addEventListener("close", () => { courtTextSubmit = null; courtTextComposing = false; });
+courtTextDialog.addEventListener("close", () => {
+  // 前回のcloseイベントが遅れて届いても、開き直した入力を破棄しません。
+  if (!courtTextDialog.open) { courtTextSubmit = null; courtTextComposing = false; }
+});
 
 // Pointer移動を処理します。
 function handlePointerMove(event) {
