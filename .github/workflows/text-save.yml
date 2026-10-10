@@ -4,15 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows: ['pages build and deployment']
-    types: [completed]
-    branches: [main]
 permissions:
   contents: read
 jobs:
   test:
-    if: github.event_name != 'workflow_run'
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +32,8 @@ jobs:
           name: canvas-text-save-${{ matrix.os }}
           path: reports/text-save
   live:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -45,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
