@@ -26,11 +26,14 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: node tests/connection-hub.browser.cjs
       - run: node tests/text-save.browser.cjs
+      - run: node tests/keyboard-coaching.browser.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: canvas-text-save-${{ matrix.os }}
-          path: reports/text-save
+          path: |
+            reports/text-save
+            reports/keyboard-coaching
   live:
     needs: test
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')

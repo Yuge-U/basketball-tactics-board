@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" sizes="192x192" href="./safari-canvas-192-20261007j.png" /><link rel="alternate icon" type="image/png" sizes="512x512" href="./1_App/img/zeroone_icon_512.png?v=20261007d" />
   <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-zero-one-180-20261007m.png">
   <!-- 画面デザイン用のCSSを読み込みます。 -->
-  <link rel="stylesheet" href="./1_App/css/styles.css?v=51" />
+  <link rel="stylesheet" href="./1_App/css/styles.css?v=52" />
   <!-- ブラウザーのタブに表示する名前です。 -->
   <title>ZEROONE CANVAS｜動くバスケ作戦キャンバス</title>
 <link rel="stylesheet" href="./zero-one-connection.css?v=20261008-hub">
@@ -204,7 +204,7 @@
         <!-- Canvasを配置する外枠です。 -->
         <div id="canvasShell" class="canvas-shell">
           <!-- 作戦ボード本体です。 -->
-          <canvas id="tacticsCanvas" aria-label="バスケットボール作戦ボード"></canvas>
+          <canvas id="tacticsCanvas" tabindex="0" aria-label="バスケットボール作戦ボード"></canvas>
           <!-- 操作ヒントを重ねて表示します。 -->
           <div id="canvasHint" class="canvas-hint">移動・ドリブル・スクリーンは選手から描くと、その軌道に沿って再生されます</div>
           <!-- コート最大化時に使う最小操作ボタンです。 -->
@@ -760,6 +760,32 @@
     </div>
   </dialog>
 
+  <!-- モーダルにせず、説明中もコート操作を続けられるショートカット一覧です。 -->
+  <button id="shortcutGuideButton" class="shortcut-guide-toggle" type="button" aria-label="キーボード操作一覧" aria-expanded="false" aria-controls="shortcutGuide" title="キーボード操作一覧（?）">?</button>
+  <aside id="shortcutGuide" class="shortcut-guide" aria-label="キーボード操作一覧" hidden>
+    <div class="shortcut-guide-heading">
+      <div><p class="eyebrow">ZERO ONE · CANVAS</p><strong>キーボード操作</strong></div>
+      <button id="closeShortcutGuideButton" class="icon-button" type="button" aria-label="操作一覧を閉じる">×</button>
+    </div>
+    <dl>
+      <dt><kbd>Space</kbd></dt><dd>再生 / 一時停止 / 再開</dd>
+      <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>前 / 次のSTEP（再生を終了）</dd>
+      <dt><kbd>Shift</kbd> + <kbd>← / →</kbd></dt><dd>最初 / 最後のSTEP</dd>
+      <dt><kbd>R</kbd></dt><dd>最初から再生</dd>
+      <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>再生速度 ±0.25×（0.5〜2×）</dd>
+      <dt><kbd>V</kbd> <kbd>M</kbd> <kbd>P</kbd></dt><dd>選択・移動 / 移動線 / パス線</dd>
+      <dt><kbd>D</kbd> <kbd>S</kbd> <kbd>T</kbd></dt><dd>ドリブル曲線 / スクリーン曲線 / テキスト</dd>
+      <dt><kbd>Delete / Backspace</kbd></dt><dd>選択オブジェクトを削除</dd>
+      <dt><kbd>Ctrl / ⌘</kbd> + <kbd>Z</kbd></dt><dd>元に戻す</dd>
+      <dt><kbd>Ctrl / ⌘</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dt><dd>やり直す（Ctrl / ⌘ + Yも可）</dd>
+      <dt><kbd>Ctrl / ⌘</kbd> + <kbd>S</kbd></dt><dd>作戦を保存</dd>
+      <dt><kbd>Esc</kbd></dt><dd>再生終了 / 操作取消 / 選択解除</dd>
+      <dt><kbd>C</kbd></dt><dd>コーチングモード ON / OFF</dd>
+      <dt><kbd>?</kbd></dt><dd>この一覧を表示 / 非表示</dd>
+    </dl>
+    <p class="shortcut-guide-note">数字0〜9の既存ツール切替も使用できます。直線ドリブルは5、直線スクリーンは7。選択・配置・描画は従来どおりマウス / タッチで行えます。主ボールは削除できません。入力・変換・ダイアログ表示中は無効です。</p>
+  </aside>
+
   <!-- 一時メッセージを表示します。 -->
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
@@ -805,6 +831,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=45"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=54"></script>
+  <script defer src="./1_App/js/app.js?v=55"></script>
 </body>
 </html>
