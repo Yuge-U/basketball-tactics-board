@@ -1,0 +1,9 @@
+{
+  "app": "CANVAS",
+  "directories": [
+    "1_App/js",
+    "1_App/css"
+  ],
+  "worker": "service-worker.js",
+  "versionMount": "#settingsDialog"
+}

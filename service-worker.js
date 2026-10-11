@@ -1,55 +1,32 @@
-// GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v56-action-shortcuts";
-
-// アプリ本体として保存するファイルです。
-const APP_FILES = [
-  "./",
-  "./index.html",
-  "./zero-one-connection.js",
-  "./zero-one-connection.css",
-  "./Basketball_Tactics_Board.html",
-  "./1_App/manifest.webmanifest",
-  "./1_App/css/styles.css",
-  "./1_App/js/vendor/msal-browser.min.js",
-  "./1_App/js/vendor/MSAL-LICENSE.txt",
-  "./1_App/js/onedrive-config.js",
-  "./1_App/js/onedrive-storage.js",
-  "./1_App/js/folder-access.js",
-  "./1_App/js/app.js",
-  "./1_App/img/zeroone_icon.png",
-  "./1_App/img/zeroone_icon_180.png",
-  "./1_App/img/zeroone_icon_192.png",
-  "./1_App/img/zeroone_icon_512.png"
-];
-
-// 初回公開時にアプリファイルを端末へ保存します。
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES))
-  );
-  self.skipWaiting();
+/* One registration, static same-origin application assets only. No auth/API caching. */
+const BUILD_ID='ea77232bc2ab942b37f0825c5e47579d0ccbec45dc29e9d6c9c4e6fceefb4f2d';
+const APP='CANVAS';
+const CACHE_PREFIX='zeroone-canvas-release-';
+const APP_VERSION='56';
+const APP_ASSETS=["1_App/css/styles.css","1_App/img/zeroone_icon.png","1_App/img/zeroone_icon_512.png","1_App/js/app.js","1_App/js/folder-access.js","1_App/js/onedrive-config.js","1_App/js/onedrive-storage.js","1_App/js/vendor/msal-browser.min.js","1_App/manifest.webmanifest","Basketball_Tactics_Board.html","apple-touch-zero-one-180-20261007m.png","boot.js","brand-entry.js","index.html","manifest.webmanifest","safari-canvas-192-20261007j.png","service-worker.js","zero-one-connection.css","zero-one-connection.js","zero-one-update.css","zero-one-update.js"];
+const clientBuilds=new Map();
+let releasePromise;
+const validId=id=>typeof id==='string'&&/^[a-f0-9]{64}$/.test(id);
+const ownedPath=path=>typeof path==='string'&&/^[-\w./]+$/.test(path)&&!path.startsWith('/')&&!path.split('/').some(p=>!p||p==='.'||p==='..');
+const authReturn=url=>['code','state','error','id_token','access_token'].some(key=>url.searchParams.has(key)||new URLSearchParams(url.hash.slice(1)).has(key));
+const base=self.registration.scope;
+async function readRelease(){const cache=await caches.open(CACHE_PREFIX+BUILD_ID);const stored=await cache.match(new URL('app-version.json',base));if(!stored)throw Error('Missing completed app cache');return stored.json();}
+function release(){return releasePromise??=readRelease();}
+async function install(){const url=new URL('app-version.json',base);url.searchParams.set('check',BUILD_ID);const response=await fetch(url,{cache:'no-store',credentials:'omit'});if(!response.ok)throw Error('Release unavailable');const data=await response.json();if(data.schema!==1||data.app!==APP||data.buildId!==BUILD_ID||!Array.isArray(data.files)||!data.files.length||data.files.length>300||!data.files.some(f=>f.path==='index.html'))throw Error('Mismatched release');const names=new Set();const cache=await caches.open(CACHE_PREFIX+BUILD_ID);for(const file of data.files){if(!ownedPath(file.path)||!validId(file.sha256)||names.has(file.path))throw Error('Invalid asset');names.add(file.path);const target=new URL(file.path,base);const request=new URL(target);request.searchParams.set('build',BUILD_ID);const fetched=await fetch(request,{cache:'no-store',credentials:'omit'});if(!fetched.ok||fetched.type==='opaque')throw Error('Asset unavailable');const bytes=await fetched.clone().arrayBuffer(),digest=await crypto.subtle.digest('SHA-256',bytes);const hash=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');if(hash!==file.sha256)throw Error('Incomplete deployment');await cache.put(target,fetched);}await cache.put(new URL('app-version.json',base),new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}}));}
+self.addEventListener('install',event=>{event.waitUntil(install());}); // Existing clients keep their running code; wait for explicit update.
+self.addEventListener('activate',event=>{event.waitUntil(self.clients.claim());}); // No navigation, no storage/cache deletion.
+self.addEventListener('message',event=>{
+  const data=event.data,reply=value=>event.ports?.[0]?.postMessage(value);
+  if(data?.type==='ZERO_ONE_CLIENT_BUILD'&&validId(data.buildId)&&event.source?.id){clientBuilds.set(event.source.id,data.buildId);return;}
+  if(data?.type==='ZERO_ONE_RELEASE_INFO')event.waitUntil(release().then(()=>reply({buildId:BUILD_ID,ready:true})).catch(()=>reply({buildId:BUILD_ID,ready:false})));
+  if(data?.type==='ZERO_ONE_APPLY_UPDATE')event.waitUntil(release().then(async()=>{if(data.buildId!==BUILD_ID){reply({accepted:false});return;}await self.skipWaiting();reply({accepted:true});}).catch(()=>reply({accepted:false})));
+  if(data?.type==='offlineCheck')event.waitUntil(release().then(()=>event.source?.postMessage({type:'offlineStatus',version:APP_VERSION,buildId:BUILD_ID,appShellReady:true})).catch(()=>event.source?.postMessage({type:'offlineStatus',version:APP_VERSION,appShellReady:false})));
 });
-
-// 新しい版へ更新したときに古いキャッシュを削除します。
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key.startsWith("zeroone-canvas-") && key !== CACHE_NAME).map((key) => caches.delete(key))
-    ))
-  );
-  self.clients.claim();
-});
-
-// 通信できる場合は最新版を優先し、通信できない場合は保存済みファイルを使います。
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
-  );
+self.addEventListener('fetch',event=>{
+  const request=event.request,url=new URL(request.url);if(request.method!=='GET'||url.origin!==new URL(base).origin||!url.href.startsWith(base)||url.pathname===new URL('app-version.json',base).pathname||authReturn(url))return;
+  const path=url.pathname.slice(new URL(base).pathname.length)||'index.html';if(!APP_ASSETS.includes(path))return;
+  event.respondWith((async()=>{await release();
+    const requested=url.searchParams.get('build'),client=clientBuilds.get(event.clientId);const version=request.mode==='navigate'?BUILD_ID:validId(requested)?requested:client||BUILD_ID;
+    const cache=await caches.open(CACHE_PREFIX+version);const response=await cache.match(new URL(path,base));if(response)return response;return fetch(request,{cache:'no-store'});
+  })().catch(()=>Response.error()));
 });
