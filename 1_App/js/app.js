@@ -3449,6 +3449,8 @@ function clonePlayerPositionMap(players) {
 
 // Pointer押下を処理します。
 function handlePointerDown(event) {
+  // preventDefaultで入力欄のフォーカスが残らないよう、コートへ操作を戻します。
+  canvas.focus({ preventScroll: true });
   // 再生中は編集を止めます。
   if (playbackTimer) {
     return;
@@ -5097,12 +5099,14 @@ async function stepPlaybackForward() {
   updatePlayButtonLabels("■ 停止");
   // 現在配置を表示します。
   updatePlaybackVisual(step, playerPositions, ballState.positions);
+  framePlayback.inProgress = true;
   // 次の一動作グループだけを再生します。
   await animateActionGroup(groups[framePlayback.completedGroups], step, playerPositions, ballState, runId);
   // 停止されず完了した場合を処理します。
   if (playbackTimer === runId) {
     // 完了動作数を一つ進めます。
     framePlayback.completedGroups += 1;
+    framePlayback.inProgress = false;
     // 最終位置を表示したまま停止します。
     finishPlaybackAtEnd();
   }
@@ -5147,6 +5151,28 @@ function stepPlaybackBackward() {
   updatePlaybackVisual(step, frameState.players, frameState.balls);
   // 画面を同期します。
   syncInterface(false);
+}
+
+// 再生中・一時停止中も、現在の動作順を基準にコマ送りします。
+function stepPlaybackByKeyboard(forward) {
+  if (playbackTimer) {
+    const position = framePlayback ? { ...framePlayback } : null;
+    stopPlayback(false);
+    if (position) {
+      framePlayback = { stepIndex: position.stepIndex, completedGroups: position.completedGroups };
+      // 動作の途中なら、進むキーは終点へ、戻るキーはその動作の開始配置へ移します。
+      if (position.inProgress) {
+        if (forward) framePlayback.completedGroups += 1;
+        const step = state.steps[framePlayback.stepIndex];
+        const frameState = calculateStepStateAfterGroups(step, framePlayback.completedGroups);
+        updatePlaybackVisual(step, frameState.players, frameState.balls);
+        syncInterface(false);
+        return;
+      }
+    }
+  }
+  if (forward) stepPlaybackForward();
+  else stepPlaybackBackward();
 }
 
 // 連続再生できるSTEPまたは動作があるか確認します。
@@ -5233,6 +5259,7 @@ async function playSteps() {
 async function animateStepAlongLines(step, runId) {
   // 再生順ごとの動作グループを取得します。
   const groups = getOrderedActionGroups(step);
+  framePlayback = { stepIndex: state.steps.findIndex((item) => item.id === step.id), completedGroups: 0 };
   // 再生対象がない場合は短時間表示して終えます。
   if (groups.length === 0) {
     // 待機処理を返します。
@@ -5255,16 +5282,19 @@ async function animateStepAlongLines(step, runId) {
   // Canvasを再描画します。
   render();
   // 再生順の小さいグループから実行します。
-  for (const group of groups) {
+  for (const [groupIndex, group] of groups.entries()) {
     // 停止された場合はループを終了します。
     if (playbackTimer !== runId) {
       // 再生処理を終了します。
       break;
     }
     // 現在の動作グループを再生します。
+    framePlayback.inProgress = true;
     await animateActionGroup(group, step, playerPositions, ballState, runId);
     // 各順番の区切りを分かりやすくする短い間を入れます。
     if (playbackTimer === runId) {
+      framePlayback.completedGroups = groupIndex + 1;
+      framePlayback.inProgress = false;
       // 次の順番まで少し待ちます。
       await waitForPlayback(120, runId);
     }
@@ -7336,6 +7366,8 @@ function handleKeyDown(event) {
     else if (key === "s" && !event.shiftKey) action = savePlayToLibrary;
   } else if (key === "?") {
     action = toggleShortcutGuide;
+  } else if ((key === "arrowdown" || key === "arrowup") && !event.shiftKey) {
+    action = () => stepPlaybackByKeyboard(key === "arrowdown");
   } else if (key === "arrowright" || key === "arrowleft") {
     action = () => {
       const index = state.steps.findIndex((step) => step.id === state.activeStepId);
@@ -7349,11 +7381,16 @@ function handleKeyDown(event) {
       playbackSpeedRange.dispatchEvent(new Event("input"));
       showToast(`再生速度 ${state.playbackSpeed.toFixed(2)}×`);
     };
-  } else if (!event.shiftKey) {
+  } else if (!event.shiftKey || /^[vmdpstrc]$/.test(key)) {
     const keyMap = { v: "select", m: "move", d: "dribbleFree", p: "pass", s: "screenFree", t: "text",
       "1": "select", "2": "move", "3": "pass", "4": "dribbleFree", "5": "dribbleStraight",
       "6": "screenFree", "7": "screenStraight", "8": "free", "9": "erase", "0": "text" };
-    if (keyMap[key]) action = () => { if (!playbackTimer) { setTool(keyMap[key]); render(); } };
+    if (keyMap[key]) action = () => {
+      if (playbackTimer) stopPlayback(false);
+      setTool(keyMap[key]);
+      render();
+      showToast(`${TOOL_LABELS[keyMap[key]]}に切り替えました`);
+    };
     else if (key === " ") action = togglePlaybackPause;
     else if (key === "r") action = () => { stopPlayback(false); selectStep(state.steps[0].id); playSteps(); };
     else if (key === "c") action = () => setCoachingMode(!isCoachingMode);

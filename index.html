@@ -214,11 +214,11 @@
             <!-- コートと全STEPを同時に回転します。 -->
             <button id="focusRotateCourtButton" class="focus-button" type="button" aria-label="コートを90度回転（現在: 上向き）" title="コートと全STEPを時計回りに90度回転（現在: 上向き）" aria-pressed="false">↻</button>
             <!-- 一つ前の動作またはSTEPへ戻ります。 -->
-            <button id="focusPreviousFrameButton" class="focus-button" type="button" aria-label="前へ" title="前へ">⏮</button>
+            <button id="focusPreviousFrameButton" class="focus-button" type="button" aria-label="前へ" title="前の動作へ（↑）">⏮</button>
             <!-- 最大表示のまま全STEPを連続再生します。 -->
             <button id="focusPlayButton" class="focus-button primary" type="button" aria-label="再生" title="再生">▶</button>
             <!-- 次の動作またはSTEPへ進みます。 -->
-            <button id="focusNextFrameButton" class="focus-button" type="button" aria-label="次へ" title="次へ">⏭</button>
+            <button id="focusNextFrameButton" class="focus-button" type="button" aria-label="次へ" title="次の動作へ（↓）">⏭</button>
           </div>
           <!-- 最大表示中のSTEP一覧を薄いアイコンで開閉します。 -->
           <div class="focus-visibility-controls" aria-label="最大表示中の表示切替">
@@ -374,9 +374,9 @@
             <button id="moveStepBackwardButton" class="button step-icon-button" type="button" aria-label="STEPを前へ移動" title="STEPを前へ移動">←</button>
             <button id="moveStepForwardButton" class="button step-icon-button" type="button" aria-label="STEPを次へ移動" title="STEPを次へ移動">→</button>
             <button id="deleteStepButton" class="button danger step-icon-button" type="button" aria-label="現在のSTEPを削除" title="現在のSTEPを削除">🗑</button>
-            <button id="previousFrameButton" class="button step-icon-button" type="button" aria-label="前の動作またはSTEPへ" title="前の動作またはSTEPへ">⏮</button>
+            <button id="previousFrameButton" class="button step-icon-button" type="button" aria-label="前の動作またはSTEPへ" title="前の動作またはSTEPへ（↑）">⏮</button>
             <button id="playStepsButton" class="button primary step-icon-button" type="button" aria-label="再生" title="再生">▶</button>
-            <button id="nextFrameButton" class="button step-icon-button" type="button" aria-label="次の動作またはSTEPへ" title="次の動作またはSTEPへ">⏭</button>
+            <button id="nextFrameButton" class="button step-icon-button" type="button" aria-label="次の動作またはSTEPへ" title="次の動作またはSTEPへ（↓）">⏭</button>
           </div>
         </div>
       </section>
@@ -770,6 +770,7 @@
     <dl>
       <dt><kbd>Space</kbd></dt><dd>再生 / 一時停止 / 再開</dd>
       <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>前 / 次のSTEP（再生を終了）</dd>
+      <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>前 / 次の動作順へコマ戻し / コマ送り</dd>
       <dt><kbd>Shift</kbd> + <kbd>← / →</kbd></dt><dd>最初 / 最後のSTEP</dd>
       <dt><kbd>R</kbd></dt><dd>最初から再生</dd>
       <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>再生速度 ±0.25×（0.5〜2×）</dd>
@@ -783,7 +784,7 @@
       <dt><kbd>C</kbd></dt><dd>コーチングモード ON / OFF</dd>
       <dt><kbd>?</kbd></dt><dd>この一覧を表示 / 非表示</dd>
     </dl>
-    <p class="shortcut-guide-note">数字0〜9の既存ツール切替も使用できます。直線ドリブルは5、直線スクリーンは7。選択・配置・描画は従来どおりマウス / タッチで行えます。主ボールは削除できません。入力・変換・ダイアログ表示中は無効です。</p>
+    <p class="shortcut-guide-note">↑ / ↓は同じ再生順の動作をまとめて確認します。再生途中なら、その動作の開始 / 終了位置で止まります。V・M・P・D・S・Tは1キーずつ押します。再生を終了して切り替わり、大文字でも使えます。数字0〜9の既存ツール切替も使用できます。直線ドリブルは5、直線スクリーンは7。選択・配置・描画は従来どおりマウス / タッチで行えます。主ボールは削除できません。入力・変換・ダイアログ表示中は無効です。入力後はコートをクリックするとキー操作に戻れます。</p>
   </aside>
 
   <!-- 一時メッセージを表示します。 -->
@@ -831,6 +832,6 @@
   <script defer src="./1_App/js/onedrive-config.js?v=22"></script>
   <script defer src="./1_App/js/onedrive-storage.js?v=45"></script>
   <script defer src="./1_App/js/folder-access.js?v=22"></script>
-  <script defer src="./1_App/js/app.js?v=55"></script>
+  <script defer src="./1_App/js/app.js?v=56"></script>
 </body>
 </html>
