@@ -1,5 +1,5 @@
 // GitHub Pages上でアプリ本体をオフライン利用できるようにします。
-const CACHE_NAME = "zeroone-canvas-v55-keyboard-coaching";
+const CACHE_NAME = "zeroone-canvas-v56-action-shortcuts";
 
 // アプリ本体として保存するファイルです。
 const APP_FILES = [

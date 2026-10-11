@@ -46,7 +46,8 @@ async function clickObject(page, point) {
 }
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const base = `http://127.0.0.1:${server.address().port}/`;
+  const base = process.env.SITE_URL || `http://127.0.0.1:${server.address().port}/`;
+  if (process.env.SITE_URL) assert.equal(base, 'https://yuge-u.github.io/basketball-tactics-board/');
   for (const [engine, type] of Object.entries({ chromium, webkit }).filter(([name]) => !process.env.CANVAS_ENGINE || name === process.env.CANVAS_ENGINE)) {
     const browser = await type.launch({ headless: true });
     browserVersions[engine] = browser.version();
@@ -156,7 +157,7 @@ async function clickObject(page, point) {
                 if (tag === 'select') el.innerHTML = '<option>選択欄</option>';
                 document.body.appendChild(el); el.focus();
               }, tag);
-              for (const key of ['m', 'c', 'Space', 'ArrowRight', '?', 'Delete', 'Control+z', 'Meta+Shift+z', 'Control+s']) await page.keyboard.press(key);
+              for (const key of ['m', 'Shift+p', 'c', 'Space', 'ArrowRight', 'ArrowUp', 'ArrowDown', '?', 'Delete', 'Control+z', 'Meta+Shift+z', 'Control+s']) await page.keyboard.press(key);
               assert.equal(await page.evaluate(() => JSON.stringify(createSnapshot())), before);
               assert.equal(await page.evaluate(() => keyboardSave.calls.length), 0);
               await page.evaluate(() => { document.getElementById('typing-fixture').remove(); canvas.focus(); });
@@ -171,11 +172,11 @@ async function clickObject(page, point) {
             await page.keyboard.press('m'); assert.equal(await page.evaluate(() => state.activeTool), 'move'); await page.keyboard.press('v');
           });
           await check(label, 'K08 modifiers, handled events and long presses never execute extra commands', async () => {
-            for (const key of ['Alt+m', 'Control+m', 'Meta+1', 'Shift+s', 'Control+Shift+s', 'Control+Meta+z']) await page.keyboard.press(key);
+            for (const key of ['Alt+m', 'Control+m', 'Meta+1', 'Shift+ArrowUp', 'Shift+ArrowDown', 'Control+Shift+s', 'Control+Meta+z']) await page.keyboard.press(key);
             assert.equal(await page.evaluate(() => state.activeTool), 'select');
             const suppressed = await page.evaluate(() => {
               const values = [];
-              for (const key of ['c', ' ', 'ArrowRight', '+', 'r', 'Delete']) {
+              for (const key of ['c', ' ', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', 'r', 'Delete']) {
                 const event = new KeyboardEvent('keydown', { key, repeat: true, bubbles: true, cancelable: true });
                 canvas.dispatchEvent(event); values.push(event.defaultPrevented);
               }
@@ -191,7 +192,7 @@ async function clickObject(page, point) {
             const count = await page.locator('dialog').count();
             for (let i = 0; i < count; i++) {
               await page.locator('dialog').nth(i).evaluate(dialog => { dialog.showModal(); dialog.focus(); });
-              await page.keyboard.press('m'); await page.keyboard.press('c'); await page.keyboard.press('Control+s');
+              await page.keyboard.press('m'); await page.keyboard.press('c'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Control+s');
               assert.equal(await page.evaluate(() => state.activeTool), 'select'); assert.equal(await page.evaluate(() => isCoachingMode), false);
               await page.locator('dialog').nth(i).evaluate(dialog => dialog.close());
             }
@@ -359,6 +360,126 @@ async function clickObject(page, point) {
             assert.equal(await page.evaluate(() => playbackTimer), runId);
             await page.keyboard.press('Escape');
             assert.deepEqual(await page.evaluate(() => createSnapshot().steps), snapshot.steps);
+          });
+          await check(label, 'K20 clicking the court returns shortcuts after name, speed and text input', async () => {
+            for (const selector of ['#playName', '#movementSpeedRange', '#playbackSpeedRange']) {
+              await page.locator(selector).focus();
+              await page.locator('#tacticsCanvas').scrollIntoViewIfNeeded();
+              await clickObject(page, { x: 100, y: 100 });
+              assert.equal(await page.evaluate(() => document.activeElement === canvas), true, JSON.stringify(await page.evaluate(selector => ({
+                selector, focus: document.activeElement.id, rect: canvas.getBoundingClientRect().toJSON(), scrollY, viewport
+              }), selector)));
+              await page.keyboard.press('m'); assert.equal(await page.evaluate(() => state.activeTool), 'move');
+              await page.keyboard.press('v');
+            }
+            await page.keyboard.press('t'); await clickObject(page, { x: 400, y: 400 });
+            await page.locator('#courtTextInput').fill('入力後のツール切替');
+            await page.locator('#applyCourtTextButton').click();
+            await page.keyboard.press('p'); assert.equal(await page.evaluate(() => state.activeTool), 'pass');
+            await page.keyboard.press('v');
+          });
+          await check(label, 'K21 all letter tools work with Shift, Caps Lock, running and paused playback', async () => {
+            const before = await page.evaluate(() => createSnapshot().steps);
+            for (const [key, tool] of Object.entries({ v: 'select', m: 'move', p: 'pass', d: 'dribbleFree', s: 'screenFree', t: 'text' })) {
+              await page.keyboard.press(`Shift+${key}`); assert.equal(await page.evaluate(() => state.activeTool), tool);
+              await page.evaluate(key => canvas.dispatchEvent(new KeyboardEvent('keydown', { key: key.toUpperCase(), bubbles: true, cancelable: true })), key);
+              assert.equal(await page.evaluate(() => state.activeTool), tool);
+              for (const paused of [false, true]) {
+                await page.keyboard.press('r');
+                await page.waitForFunction(() => playbackVisual?.players[getActiveStep().players[0].id]?.x > 210);
+                if (paused) await page.keyboard.press('Space');
+                await page.keyboard.press(key);
+                assert.equal(await page.evaluate(() => playbackTimer), null);
+                assert.equal(await page.evaluate(() => state.activeTool), tool);
+                assert.equal(await page.evaluate(() => playbackVisual), null);
+              }
+            }
+            await page.keyboard.press('c'); await page.keyboard.press('Shift+m');
+            assert(await page.evaluate(() => isCoachingMode));
+            assert.equal(await page.evaluate(() => state.activeTool), 'move');
+            assert.match(await page.locator('#toast').textContent(), /切り替えました/);
+            await page.keyboard.press('c'); await page.waitForTimeout(80);
+            assert.deepEqual(await page.evaluate(() => createSnapshot().steps), before);
+            await page.keyboard.press('v');
+          });
+          // Distinct order numbers, simultaneous players, a pass, a dribble and an empty STEP.
+          const frameFixture = await page.evaluate(() => {
+            const fixture = createSnapshot();
+            const step = fixture.steps[0], ball = getPrimaryBall(getActiveStep());
+            step.lines.forEach(line => { line.playOrder = 2; });
+            step.lines.push({ id: 'frame-pass', type: 'pass', ballId: ball.id, playOrder: 5,
+              start: { x: ball.x, y: ball.y }, end: { x: 420, y: 380 }, color: 'black' });
+            step.lines.push({ id: 'frame-dribble', type: 'dribbleFree', playerId: step.players[0].id, ballId: ball.id, playOrder: 8,
+              start: { x: 700, y: 300 }, end: { x: 850, y: 380 },
+              points: [{ x: 700, y: 300 }, { x: 775, y: 360 }, { x: 850, y: 380 }], color: 'black' });
+            fixture.steps[1].lines = [];
+            fixture.activeStepId = step.id;
+            applySnapshot(fixture); canvas.focus();
+            return fixture;
+          });
+          async function assertFrame(stepIndex, completedGroups) {
+            assert.deepEqual(await page.evaluate(() => ({ stepIndex: framePlayback?.stepIndex, completedGroups: framePlayback?.completedGroups })), { stepIndex, completedGroups });
+            assert.equal(await page.evaluate(() => playbackTimer), null);
+            const actual = await page.evaluate(() => {
+              const expected = calculateStepStateAfterGroups(getActiveStep(), framePlayback.completedGroups);
+              return { players: playbackVisual?.players, balls: playbackVisual?.balls, expectedPlayers: expected.players, expectedBalls: expected.balls };
+            });
+            assert.deepEqual(actual.players, actual.expectedPlayers); assert.deepEqual(actual.balls, actual.expectedBalls);
+          }
+          await check(label, 'K22 Up/Down follow motion order, simultaneous actions and STEP boundaries', async () => {
+            const before = await page.evaluate(() => ({ steps: createSnapshot().steps, history: undoStack.length }));
+            for (let i = 1; i <= 3; i++) {
+              await page.keyboard.press('ArrowDown'); await page.waitForFunction(() => playbackTimer === null);
+              await assertFrame(0, i);
+            }
+            await page.keyboard.press('ArrowDown'); await assertFrame(1, 0);
+            await page.keyboard.press('ArrowDown'); await assertFrame(2, 0);
+            await page.keyboard.press('ArrowDown'); await page.waitForFunction(() => playbackTimer === null); await assertFrame(2, 1);
+            await page.keyboard.press('ArrowDown'); await assertFrame(2, 1);
+            for (const [step, groups] of [[2, 0], [1, 0], [0, 3], [0, 2], [0, 1], [0, 0], [0, 0]]) {
+              await page.keyboard.press('ArrowUp'); await assertFrame(step, groups);
+            }
+            assert.deepEqual(await page.evaluate(() => createSnapshot().steps), before.steps);
+            assert.equal(await page.evaluate(() => undoStack.length), before.history);
+            await page.keyboard.press('ArrowRight'); assert.equal(await page.evaluate(() => state.activeStepId), frameFixture.steps[1].id);
+            assert.equal(await page.evaluate(() => framePlayback), null);
+            await page.keyboard.press('ArrowLeft'); assert.equal(await page.evaluate(() => state.activeStepId), frameFixture.steps[0].id);
+          });
+          await check(label, 'K23 motion stepping works from a running or paused group without restarting the STEP', async () => {
+            for (const paused of [false, true]) {
+              for (const [key, groups] of [['ArrowDown', 2], ['ArrowUp', 1]]) {
+                await page.keyboard.press('r');
+                await page.waitForFunction(() => framePlayback?.completedGroups === 1 && framePlayback.inProgress);
+                if (paused) await page.keyboard.press('Space');
+                await page.keyboard.press(key); await assertFrame(0, groups);
+                await page.waitForTimeout(100); await assertFrame(0, groups);
+              }
+            }
+            // A subsequent frame animation must survive cancellation of a paused single-group run.
+            await page.keyboard.press('Escape'); await page.keyboard.press('ArrowDown');
+            await page.waitForFunction(() => playbackVisual?.players[getActiveStep().players[0].id]?.x > 250);
+            await page.keyboard.press('Space'); await page.keyboard.press('ArrowDown'); await assertFrame(0, 1);
+            await page.keyboard.press('ArrowDown'); await page.waitForFunction(() => playbackTimer === null); await assertFrame(0, 2);
+            await page.keyboard.press('Escape');
+            assert.deepEqual(await page.evaluate(() => createSnapshot().steps), frameFixture.steps);
+          });
+          await check(label, 'K24 coaching motion keys prevent scrolling, repeat and stale completion in STEP gaps', async () => {
+            await page.keyboard.press('c'); await page.waitForTimeout(80);
+            const scroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
+            await page.keyboard.press('ArrowDown'); await page.waitForFunction(() => playbackTimer === null); await assertFrame(0, 1);
+            await page.keyboard.press('ArrowUp'); await assertFrame(0, 0);
+            const repeated = await page.evaluate(() => {
+              const event = new KeyboardEvent('keydown', { key: 'ArrowDown', repeat: true, bubbles: true, cancelable: true });
+              canvas.dispatchEvent(event); return event.defaultPrevented;
+            });
+            assert(repeated); await assertFrame(0, 0);
+            assert.deepEqual(await page.evaluate(() => ({ x: scrollX, y: scrollY })), scroll);
+            await page.keyboard.press('c'); await page.waitForTimeout(80);
+            await page.evaluate(snapshot => { applySnapshot(snapshot); state.steps[0].lines = []; canvas.focus(); }, frameFixture);
+            await page.keyboard.press('r'); await page.keyboard.press('Space');
+            await page.keyboard.press('ArrowDown'); await assertFrame(1, 0);
+            await page.waitForTimeout(800); await assertFrame(1, 0);
+            await page.keyboard.press('ArrowUp'); await assertFrame(0, 0);
           });
         } finally { await context.close(); }
       }
