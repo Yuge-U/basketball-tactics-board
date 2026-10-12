@@ -1,5 +1,5 @@
 /* One registration, static same-origin application assets only. No auth/API caching. */
-const BUILD_ID='ea77232bc2ab942b37f0825c5e47579d0ccbec45dc29e9d6c9c4e6fceefb4f2d';
+const BUILD_ID='889523376000eb5df11def85c54e1620a59ffbbb911163aefb9a7d1f07465a3d';
 const APP='CANVAS';
 const CACHE_PREFIX='zeroone-canvas-release-';
 const APP_VERSION='56';
