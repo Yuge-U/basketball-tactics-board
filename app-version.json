@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "app": "CANVAS",
-  "buildId": "d46a142050a1552791c56868b0e87183c219f3a93ca1783ffbc39afbf7d48669",
+  "buildId": "66282d116342f16875a8dcf6aa8d501680d54e4611e5ad3f836323349aa3824f",
   "files": [
     {
       "path": "1_App/css/styles.css",
@@ -41,7 +41,7 @@
     },
     {
       "path": "Basketball_Tactics_Board.html",
-      "sha256": "cfc56f8b88d87cd0fc179a7892d6fc3a550ba7ddc26db467e41f00399053e10d"
+      "sha256": "81e600abb6f8fed8c270741fe60f159d735e26feb046438047b6163fa39dd43e"
     },
     {
       "path": "apple-touch-zero-one-180-20261007m.png",
@@ -57,7 +57,7 @@
     },
     {
       "path": "index.html",
-      "sha256": "9149a3c35e227323db585343f5e230f81cd8affd22f969628353a5495164ad2e"
+      "sha256": "f7b8dc45fdc5a8bd273270bbeeef16a1580174f19cebf1d5ad958603a56365f6"
     },
     {
       "path": "manifest.webmanifest",
@@ -69,7 +69,7 @@
     },
     {
       "path": "service-worker.js",
-      "sha256": "223867a0606f7ea2a36d54ee5d596f59ad4b8190e637a39fbacc8b09e1ec9a49"
+      "sha256": "880bef8b43adea01e8b450b5afa739b647c51372afcc26e971937e78a7de1d14"
     },
     {
       "path": "zero-one-connection.css",
