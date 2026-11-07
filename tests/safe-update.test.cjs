@@ -12,9 +12,9 @@ const manifest={schema:1,app:'TEST',buildId:id,files:[{path:'index.html',sha256:
 test('manifest rejects traversal, remote URLs, duplicate paths, malformed builds and wrong apps',()=>{assert.equal(api.validateRelease(manifest,'TEST'),manifest);for(const path of ['../auth','https://example.test/token','/app.js','a//b','a/./b'])assert.throws(()=>api.validateRelease({...manifest,files:[{path,sha256:id}]},'TEST'));assert.throws(()=>api.validateRelease({...manifest,files:[...manifest.files,manifest.files[0]]},'TEST'));assert.throws(()=>api.validateRelease({...manifest,buildId:'stale'},'TEST'));assert.throws(()=>api.validateRelease(manifest,'OTHER'));});
 test('OAuth query/hash callbacks are recognized without changing the URL',()=>{for(const params of ['?code=test&state=x','#access_token=test','?error=denied','#id_token=test']){const url=new URL('https://example.test/app/'+params),before=url.href;assert(api.authReturn(url));assert.equal(url.href,before);}assert(!api.authReturn(new URL('https://example.test/app/?filter=keep#settings')));});
 test('incomplete deployment and failed downloads are rejected before update',async()=>{await api.verifyAsset(new Response('js'),digest('js'));await assert.rejects(()=>api.verifyAsset(new Response('old-js'),digest('js')));await assert.rejects(()=>api.verifyAsset(new Response('missing',{status:404}),digest('js')));});
-function worker({corrupt=false,offline=false}={}){
+function worker({corrupt=false,offline=false,cacheFailure=false}={}){
  const events={},maps=new Map(),requests=[],deleted=[];let skips=0,claims=0;
- const caches={open:async name=>{if(!maps.has(name))maps.set(name,new Map());const map=maps.get(name);return {put:async(k,v)=>map.set(String(k),v),match:async k=>map.get(String(k))?.clone()};},delete:async key=>deleted.push(key)};
+ const caches={open:async name=>{if(cacheFailure)throw Error('CacheStorage unavailable');if(!maps.has(name))maps.set(name,new Map());const map=maps.get(name);return {put:async(k,v)=>map.set(String(k),v),match:async k=>map.get(String(k))?.clone()};},delete:async key=>deleted.push(key)};
  const self={registration:{scope:'https://example.test/app/'},clients:{claim:async()=>claims++},skipWaiting:async()=>skips++,addEventListener:(name,fn)=>events[name]=fn};
  const fetch=async request=>{requests.push(String(request.url||request));if(offline)throw Error('offline');const url=new URL(request.url||request);if(url.pathname.endsWith('app-version.json'))return new Response(JSON.stringify(manifest));return new Response(url.pathname.endsWith('index.html')?'html':corrupt?'old-js':'js');};
  const source=readFileSync(process.env.UPDATE_WORKER_TEMPLATE||join(__dirname,'update-worker.fixture.js'),'utf8').replace('__ZERO_ONE_ASSETS__',JSON.stringify(manifest.files.map(file=>file.path))).replace('__ZERO_ONE_BUILD__',id).replace('__ZERO_ONE_APP__','TEST').replace('__ZERO_ONE_CACHE_PREFIX__','test-owned-release-').replace('__ZERO_ONE_VERSION__','1');
@@ -47,4 +47,21 @@ test('update boot waits for the established entry URL and preserves OAuth callba
   const pending=boot('https://example.test/practice/');assert.equal(pending.zeroOneUpdater,undefined);assert.equal(pending.location.href,'https://example.test/practice/');
   const settled=boot('https://example.test/practice/?brand=20261007k');assert.equal(settled.zeroOneUpdater.current,'a'.repeat(64));
   for(const callback of ['?code=test&state=test','#code=test&state=test']){const context=boot('https://example.test/practice/'+callback);assert.equal(context.location.href,'https://example.test/practice/'+callback);assert.equal(context.zeroOneUpdater.current,'a'.repeat(64));}
+});
+
+test('lost release metadata does not block cached navigation or retained assets offline',async()=>{
+ const w=worker();await w.invoke('install');const cache=w.maps.get('test-owned-release-'+id),descriptor=cache.get('https://example.test/app/app-version.json');cache.delete('https://example.test/app/app-version.json');w.setOffline();
+ let reply;await w.invoke('message',{data:{type:'ZERO_ONE_RELEASE_INFO'},ports:[{postMessage:value=>reply=value}]});assert.equal(reply.ready,false,'incomplete update metadata must still reject activation');
+ for(const [path,mode,expected]of [['','navigate','html'],['app.js','cors','js']]){let response;w.events.fetch({request:{url:'https://example.test/app/'+path,method:'GET',mode},respondWith:promise=>response=promise});assert.equal(await(await response).text(),expected);}
+ assert.equal(w.skips,0);cache.set('https://example.test/app/app-version.json',descriptor);await w.invoke('message',{data:{type:'ZERO_ONE_RELEASE_INFO'},ports:[{postMessage:value=>reply=value}]});assert.equal(reply.ready,true,'a transient metadata failure must be retryable');assert.deepEqual(w.deleted,[]);
+});
+
+test('missing application cache falls back to the network without modifying other storage',async()=>{
+ const w=worker();await w.invoke('install');w.maps.clear();for(const [path,mode,expected]of [['index.html','navigate','html'],['app.js','cors','js']]){let response;w.events.fetch({request:{url:'https://example.test/app/'+path,method:'GET',mode},respondWith:promise=>response=promise});assert.equal(await(await response).text(),expected);}
+ assert.deepEqual(w.deleted,[]);assert.equal(w.skips,0);
+});
+
+test('CacheStorage read errors fall back to the network',async()=>{
+ const w=worker({cacheFailure:true});for(const [path,mode,expected]of [['index.html','navigate','html'],['app.js','cors','js']]){let response;w.events.fetch({request:{url:'https://example.test/app/'+path,method:'GET',mode},respondWith:promise=>response=promise});assert.equal(await(await response).text(),expected);}
+ assert.deepEqual(w.deleted,[]);
 });
