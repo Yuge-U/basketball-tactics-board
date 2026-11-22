@@ -717,6 +717,9 @@ button:disabled {
 /* 全画面内の文字入力。16px以上にして入力時の自動拡大も避けます。 */
 .library-dialog.court-text-dialog { width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; }
 .library-dialog.court-text-dialog::backdrop { backdrop-filter: none; }
+.library-dialog.step-duplicate-dialog { position: fixed; inset: 0; margin: auto; width: min(460px, calc(100vw - 24px)); height: fit-content; max-height: calc(100dvh - 24px); overflow: auto; }
+.step-duplicate-dialog > p { margin: 0 20px; font-size: 14px; line-height: 1.6; }
+.step-duplicate-actions { display: grid; gap: 10px; padding: 18px 20px 20px; }
 .court-text-content { display: grid; gap: 14px; padding: 20px; }
 .court-text-content input { width: 100%; min-width: 0; min-height: 44px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
 .court-text-actions { display: flex; justify-content: flex-end; gap: 10px; }

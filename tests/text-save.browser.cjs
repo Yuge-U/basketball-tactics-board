@@ -79,7 +79,7 @@ async function courtPoint(page, item) {
       console.log('BASELINE',label,JSON.stringify({nativePrompts:prompts,unchangedSizeAllocations:await page.evaluate(()=>canvasAllocations)}));
       continue;
     }
-    await check(label,'T01 expanded text uses in-app input',async()=>{await page.locator('#courtTextDialog').waitFor({state:'visible'});assert.equal(prompts,0);assert(await page.evaluate(()=>isFocusMode));assert.equal(await page.locator('#currentAppVersion').textContent(),'v45');});
+    await check(label,'T01 expanded text uses in-app input',async()=>{await page.locator('#courtTextDialog').waitFor({state:'visible'});assert.equal(prompts,0);assert(await page.evaluate(()=>isFocusMode));assert.equal(await page.locator('#currentAppVersion').textContent(),'v57');});
     if(config.name==='desktop')await page.screenshot({path:path.join(root,'reports','text-save',engine+'-text-entry.png')});
     const input=page.locator('#courtTextInput');
     await input.fill('スクリーン ');await input.pressSequentially('123');

@@ -173,7 +173,7 @@ const DEFAULT_SAVE_FOLDERS = Object.freeze([
   "U15/Practice"
 ]);
 // 配布版の画面・バックアップ・キャッシュで共通利用するアプリバージョンです。
-const APP_VERSION = "v45";
+const APP_VERSION = "v57";
 // 利用規約は、この値を変更すると同意済み端末にも再表示されます。
 const TERMS_VERSION = "1.0";
 // 操作ガイドは、この値を変更すると完了済み端末にも再表示されます。
@@ -3179,11 +3179,15 @@ function findDraggableAt(point) {
   }
   // 後に描いたボールから逆順で探します。
   const ball = [...getStepBalls(step)].reverse().find((item) => distance(point, item) <= getBallRadius() + 16 / Math.max(0.01, viewport.scale));
-  if (ball) {
-    return { type: "ball", id: ball.id };
-  }
   // 後に描いた選手から逆順で探します。
   const player = [...step.players].reverse().find((item) => distance(point, item) <= getPlayerRadius() + 10);
+  if (ball) {
+    // タッチ用のボール判定範囲だけが選手を覆う場合は、見えている選手をつかめるようにします。
+    if (player && distance(point, player) <= getPlayerRadius() && distance(point, ball) > getBallRadius()) {
+      return { type: "player", id: player.id };
+    }
+    return { type: "ball", id: ball.id };
+  }
   // 選手が見つかった場合は選手情報を返します。
   if (player) {
     return { type: "player", id: player.id };
@@ -3306,6 +3310,17 @@ function findBallForDribble(step, player, ballPositions) {
     .sort((left, right) => distance(player, left.point) - distance(player, right.point))[0];
   const associationDistance = getPlayerRadius() + getBallRadius() + 32;
   return nearest && distance(player, nearest.point) <= associationDistance ? nearest.ball : balls[0];
+}
+
+// 手動移動開始時に、その選手が持っている近接ボールだけを確定します。
+function findCarriedBallIds(step, playerId) {
+  const associationDistance = getPlayerRadius() + getBallRadius() + 32;
+  return getStepBalls(step).filter((ball) => {
+    // 隣り合う選手のボールを奪わないよう、ボールに最も近い選手へ関連付けます。
+    const nearest = [...step.players].reverse().reduce((closest, player) =>
+      !closest || distance(player, ball) < distance(closest, ball) ? player : closest, null);
+    return nearest?.id === playerId && distance(nearest, ball) <= associationDistance;
+  }).map((ball) => ball.id);
 }
 
 // 描画点列へ必要な間隔で点を追加します。
@@ -3494,6 +3509,8 @@ function handlePointerDown(event) {
         pointerId: event.pointerId,
         // ドラッグ対象を保存します。
         target,
+        // 途中で別のボールに近づいても持ち替えず、開始時の所持ボールだけを追従させます。
+        carriedBallIds: target.type === "player" ? findCarriedBallIds(getActiveStep(), target.id) : [],
         // 変更前スナップショットを保存します。
         before: createSnapshot(),
         // 移動・拡大縮小・回転の種別を保存します。
@@ -3720,6 +3737,15 @@ function handlePointerMove(event) {
       if (player) {
         // 選手をコート内へ収めます。
         const next = clampPoint(point, getPlayerRadius() + 4);
+        const dx = next.x - player.x;
+        const dy = next.y - player.y;
+        getStepBalls(step).forEach((ball) => {
+          if (dragSession.carriedBallIds?.includes(ball.id)) {
+            // 所持ボールは選手との相対位置を保ったまま移動します。
+            ball.x += dx;
+            ball.y += dy;
+          }
+        });
         // X位置を更新します。
         player.x = next.x;
         // Y位置を更新します。
@@ -4926,12 +4952,42 @@ function moveActiveStep(offset) {
   showToast(`STEPを${nextIndex + 1}番目へ移動しました`);
 }
 
-// 現在STEPの描画順再生後の配置を使って次STEPを追加します。
-function addStep() {
+const duplicateStepDialog = document.getElementById("duplicateStepDialog");
+let duplicateStepSourceId = null;
+
+// 動作があるSTEPだけ、複製する配置を選びます。
+function requestStepDuplication() {
+  if (duplicateStepDialog.open) return;
+  if (playbackTimer) stopPlayback(false);
+  const currentStep = getActiveStep();
+  if (!calculateStepEndState(currentStep).hasAnimation) {
+    addStep();
+    return;
+  }
+  duplicateStepSourceId = currentStep.id;
+  duplicateStepDialog.showModal();
+}
+
+function completeStepDuplication(position) {
+  const sourceId = duplicateStepSourceId;
+  duplicateStepSourceId = null;
+  duplicateStepDialog.close();
+  if (sourceId && getActiveStep().id === sourceId) addStep(position);
+}
+
+document.getElementById("duplicateStepBeforeButton").addEventListener("click", () => completeStepDuplication("before"));
+document.getElementById("duplicateStepAfterButton").addEventListener("click", () => completeStepDuplication("after"));
+document.getElementById("cancelDuplicateStepButton").addEventListener("click", () => duplicateStepDialog.close());
+duplicateStepDialog.addEventListener("close", () => {
+  if (!duplicateStepDialog.open) duplicateStepSourceId = null;
+});
+
+// 選んだ移動前・移動後の配置で次STEPを追加します。既定は従来どおり移動後です。
+function addStep(position = "after") {
   // 現在STEPを取得します。
   const currentStep = getActiveStep();
   // 描画順に全動作を適用した最終配置を計算します。
-  const endState = calculateStepEndState(currentStep);
+  const endState = position === "before" ? null : calculateStepEndState(currentStep);
   // 前回再生の表示状態を解除します。
   playbackVisual = null;
   // コマ送り位置も解除します。
@@ -4947,7 +5003,7 @@ function addStep() {
     // 全選手の再生後位置を次STEPへ反映します。
     duplicated.players.forEach((player) => {
       // 対応する最終位置を取得します。
-      const end = endState.players[player.id];
+      const end = endState?.players[player.id];
       // 最終位置がある場合だけ更新します。
       if (end) {
         // 選手Xを更新します。
@@ -4958,7 +5014,7 @@ function addStep() {
     });
     // 各ボールのパス・ドリブル後の最終位置を次STEPへ反映します。
     getStepBalls(duplicated).forEach((ball) => {
-      const end = endState.balls[ball.id];
+      const end = endState?.balls[ball.id];
       if (end) {
         ball.x = end.x;
         ball.y = end.y;
@@ -4979,7 +5035,7 @@ function addStep() {
   // 新しいSTEPでは素材選択を解除します。
   selectedCanvasItem = null;
   // 結果を通知します。
-  showToast(endState.hasAnimation ? "選手・ボールの動作後配置で次STEPを追加しました" : "現在の配置で次STEPを追加しました");
+  showToast(position === "before" ? "移動前の配置で次STEPを追加しました" : endState.hasAnimation ? "選手・ボールの動作後配置で次STEPを追加しました" : "現在の配置で次STEPを追加しました");
 }
 
 // 現在STEPを削除します。
@@ -7555,7 +7611,7 @@ focusPreviousFrameButton.addEventListener("click", stepPlaybackBackward);
 // 最大表示用の次へボタンを登録します。
 focusNextFrameButton.addEventListener("click", stepPlaybackForward);
 // 最大表示中のSTEP複製を登録します。
-document.getElementById("focusDuplicateStepButton")?.addEventListener("click", addStep);
+document.getElementById("focusDuplicateStepButton")?.addEventListener("click", requestStepDuplication);
 // 最大表示中のSTEP前後移動を登録します。
 document.getElementById("focusMoveStepBackwardButton")?.addEventListener("click", () => moveActiveStep(-1));
 document.getElementById("focusMoveStepForwardButton")?.addEventListener("click", () => moveActiveStep(1));
@@ -7600,7 +7656,7 @@ focusRedoButton.addEventListener("click", redo);
 // 初期化ボタンを登録します。
 document.getElementById("resetButton").addEventListener("click", resetBoard);
 // STEP追加ボタンを登録します。
-document.getElementById("addStepButton").addEventListener("click", addStep);
+document.getElementById("addStepButton").addEventListener("click", requestStepDuplication);
 // 現在STEPの前後移動を登録します。
 document.getElementById("moveStepBackwardButton")?.addEventListener("click", () => moveActiveStep(-1));
 document.getElementById("moveStepForwardButton")?.addEventListener("click", () => moveActiveStep(1));
