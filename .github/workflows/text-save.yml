@@ -26,6 +26,7 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: node tests/connection-hub.browser.cjs
       - run: node tests/text-save.browser.cjs
+      - run: node tests/player-step.browser.cjs
       - run: node tests/keyboard-coaching.browser.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -34,6 +35,7 @@ jobs:
           path: |
             reports/text-save
             reports/keyboard-coaching
+            reports/player-step
   live:
     needs: test
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -53,6 +55,7 @@ jobs:
       - run: npm install --no-save --package-lock=false --ignore-scripts playwright@1.63.0
       - run: npx playwright install --with-deps chromium webkit
       - run: node tests/text-save.browser.cjs
+      - run: node tests/player-step.browser.cjs
       - run: node tests/keyboard-coaching.browser.cjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -61,3 +64,4 @@ jobs:
           path: |
             reports/text-save
             reports/keyboard-coaching
+            reports/player-step

@@ -129,9 +129,30 @@ source += `\n;globalThis.__multiBallTest = {
   assignDefaultPlayOrders,
   getStepBalls,
   getPrimaryBall,
+  createInitialState,
+  findCarriedBallIds,
+  findDraggableAt,
+  getPlayerRadius,
+  getBallRadius,
   findPlayerAt,
   addStep,
   createSnapshot,
+  handlePointerDown,
+  handlePointerMove,
+  handlePointerUp,
+  cancelCanvasOperation,
+  undo,
+  redo,
+  setViewportForTest(width, scale) {
+    window.innerWidth = width;
+    mobileLayoutEnabled = width <= 600;
+    viewport.scale = scale;
+  },
+  pointerAt(point) {
+    return { pointerId: 1, preventDefault() {},
+      clientX: viewport.offsetX + (point.x + COURT_OUTER_MARGIN) * viewport.scale,
+      clientY: viewport.offsetY + (point.y + COURT_OUTER_MARGIN) * viewport.scale };
+  },
   state
 };`;
 vm.runInContext(source, context, { filename: appPath });
@@ -210,5 +231,123 @@ assert.equal(savedSnapshot.steps[1].ball.x, 320);
 const reloadedSnapshot = api.migrateSnapshot(savedSnapshot);
 assert.equal(reloadedSnapshot.steps[1].balls[1].id, "ball-two");
 assert.equal(reloadedSnapshot.steps[1].balls[1].x, 500);
+
+// Choosing the initial arrangement copies every original position rather than any action endpoint.
+api.state.steps = [plain({ ...multiStep, note: "元のコーチングポイント" })];
+api.state.activeStepId = multiStep.id;
+api.state.steps = api.migrateSnapshot(plain(api.createSnapshot())).steps;
+const beforeCopySnapshot = plain(api.createSnapshot());
+api.addStep("before");
+const initialCopy = api.state.steps[1];
+assert.deepEqual(plain(api.state.steps[0]), beforeCopySnapshot.steps[0], "step duplication leaves the source unchanged");
+assert.deepEqual(plain(initialCopy.players), beforeCopySnapshot.steps[0].players);
+assert.deepEqual(plain(initialCopy.balls), beforeCopySnapshot.steps[0].balls);
+assert.equal(initialCopy.ball, initialCopy.balls[0]);
+assert.equal(initialCopy.lines.length, 0);
+assert.equal(initialCopy.note, "");
+assert.notEqual(initialCopy.id, multiStep.id);
+assert.equal(api.state.activeStepId, initialCopy.id);
+const copiedInitialSnapshot = plain(api.createSnapshot());
+api.undo();
+assert.deepEqual(plain(api.createSnapshot()), beforeCopySnapshot);
+api.redo();
+assert.deepEqual(plain(api.createSnapshot()), copiedInitialSnapshot);
+const reloadedInitialCopy = api.migrateSnapshot(copiedInitialSnapshot).steps[1];
+assert.equal(reloadedInitialCopy.players[0].x, 100);
+assert.equal(reloadedInitialCopy.balls[0].x, 120);
+assert.equal(reloadedInitialCopy.balls[1].x, 400);
+
+// Manual player dragging carries only the balls held at the start, without changing their offsets.
+const dragStep = {
+  id: "drag-step", label: "STEP 1", note: "", cones: [], texts: [], media: [], lines: [],
+  players: [
+    { id: "holder", side: "offense", label: "1", x: 300, y: 400 },
+    { id: "other-holder", side: "offense", label: "2", x: 500, y: 400 }
+  ],
+  balls: [
+    { id: "ball", label: "1", x: 350, y: 400 },
+    { id: "other-ball", label: "2", x: 540, y: 400 },
+    { id: "second-held-ball", label: "3", x: 300, y: 450 },
+    { id: "loose-ball", label: "4", x: 900, y: 500 }
+  ]
+};
+api.state.steps = [plain(dragStep)];
+api.state.activeStepId = dragStep.id;
+api.state.activeTool = "select";
+const active = () => api.state.steps[0];
+const positions = (items) => plain(items.map(({ id, x, y }) => ({
+  id, x: Math.round(x * 1e8) / 1e8, y: Math.round(y * 1e8) / 1e8
+})));
+assert.deepEqual(plain(api.findCarriedBallIds(active(), "holder")), ["ball", "second-held-ball"]);
+assert.deepEqual(plain(api.findCarriedBallIds(active(), "other-holder")), ["other-ball"]);
+const adjacentPlayers = { players: [
+  { id: "left", x: 300, y: 400 }, { id: "right", x: 350, y: 400 }
+], balls: [{ id: "near-right", x: 335, y: 400 }] };
+assert.deepEqual(plain(api.findCarriedBallIds(adjacentPlayers, "left")), []);
+assert.deepEqual(plain(api.findCarriedBallIds(adjacentPlayers, "right")), ["near-right"]);
+const originalDragSnapshot = plain(api.createSnapshot());
+api.handlePointerDown(api.pointerAt({ x: 300, y: 400 }));
+for (const point of [{ x: 700, y: 500 }, { x: 900, y: 500 }, { x: 950, y: 550 }]) {
+  api.handlePointerMove(api.pointerAt(point));
+}
+api.handlePointerUp(api.pointerAt({ x: 950, y: 550 }));
+assert.deepEqual(positions(active().players), [
+  { id: "holder", x: 950, y: 550 }, { id: "other-holder", x: 500, y: 400 }
+]);
+assert.deepEqual(positions(active().balls), [
+  { id: "ball", x: 1000, y: 550 }, { id: "other-ball", x: 540, y: 400 },
+  { id: "second-held-ball", x: 950, y: 600 }, { id: "loose-ball", x: 900, y: 500 }
+]);
+assert.equal(active().ball, active().balls[0], "legacy ball reference follows the primary ball");
+const movedDragSnapshot = plain(api.createSnapshot());
+api.undo();
+assert.deepEqual(plain(api.createSnapshot()), originalDragSnapshot, "one undo restores both player and held balls");
+api.redo();
+assert.deepEqual(plain(api.createSnapshot()), movedDragSnapshot);
+
+// A ball remains independently draggable, and cancelling a later player drag restores the whole group.
+api.handlePointerDown(api.pointerAt({ x: 1000, y: 550 }));
+api.handlePointerMove(api.pointerAt({ x: 800, y: 700 }));
+api.handlePointerUp(api.pointerAt({ x: 800, y: 700 }));
+assert(Math.abs(active().balls[0].x - 800) < 1e-8);
+assert(Math.abs(active().players[0].x - 950) < 1e-8);
+const beforeCancel = plain(api.createSnapshot());
+api.handlePointerDown(api.pointerAt({ x: 950, y: 550 }));
+api.handlePointerMove(api.pointerAt({ x: 850, y: 350 }));
+api.cancelCanvasOperation();
+assert.deepEqual(plain(api.createSnapshot()), beforeCancel, "Escape restores player and all followed balls");
+const restoredManualMove = api.migrateSnapshot(plain(api.createSnapshot()));
+assert.equal(restoredManualMove.schemaVersion, 18);
+assert(Math.abs(restoredManualMove.steps[0].balls[0].x - 800) < 1e-8);
+assert.equal("carriedBallIds" in restoredManualMove.steps[0], false, "drag associations are not persisted");
+
+// On a 390px iPhone layout, the ball's touch halo must not cover the visible player body.
+Object.assign(api.state, api.createInitialState());
+api.setViewportForTest(390, 0.323);
+const initialMobilePlayer = plain(active().players[0]);
+const initialMobileBall = plain(api.getPrimaryBall(active()));
+assert.equal(initialMobilePlayer.x, 525);
+assert.equal(initialMobileBall.x, 567);
+assert(api.getPlayerRadius() > 33 && api.getPlayerRadius() < 34);
+assert(api.getBallRadius() > 24 && api.getBallRadius() < 25);
+assert.deepEqual(plain(api.findDraggableAt(initialMobilePlayer)), { type: "player", id: initialMobilePlayer.id });
+assert.deepEqual(plain(api.findDraggableAt(initialMobileBall)), { type: "ball", id: initialMobileBall.id });
+assert.deepEqual(plain(api.findDraggableAt({ x: initialMobilePlayer.x + 30, y: initialMobilePlayer.y })),
+  { type: "ball", id: initialMobileBall.id }, "the visible ball body retains priority where the drawn circles overlap");
+const mobileTarget = { x: initialMobilePlayer.x + 100, y: initialMobilePlayer.y - 120 };
+api.handlePointerDown(api.pointerAt(initialMobilePlayer));
+api.handlePointerMove(api.pointerAt(mobileTarget));
+api.handlePointerUp(api.pointerAt(mobileTarget));
+assert(Math.abs(active().players[0].x - mobileTarget.x) < 1e-8, "the visible player center starts a player drag");
+assert(Math.abs(active().players[0].y - mobileTarget.y) < 1e-8);
+assert(Math.abs(active().balls[0].x - (initialMobileBall.x + 100)) < 1e-8, "its held ball follows on mobile");
+assert(Math.abs(active().balls[0].y - (initialMobileBall.y - 120)) < 1e-8);
+const mobilePlayerAfterDrag = plain(active().players[0]);
+api.handlePointerDown(api.pointerAt(active().balls[0]));
+api.handlePointerMove(api.pointerAt({ x: 300, y: 300 }));
+api.handlePointerUp(api.pointerAt({ x: 300, y: 300 }));
+assert.deepEqual(plain(active().players[0]), mobilePlayerAfterDrag, "dragging the visible mobile ball does not move its player");
+assert(Math.abs(active().balls[0].x - 300) < 1e-8);
+assert(Math.abs(active().balls[0].y - 300) < 1e-8);
 
 console.log("multi-ball compatibility tests passed");

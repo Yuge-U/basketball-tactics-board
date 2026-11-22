@@ -1,8 +1,8 @@
 /* One registration, static same-origin application assets only. No auth/API caching. */
-const BUILD_ID='66282d116342f16875a8dcf6aa8d501680d54e4611e5ad3f836323349aa3824f';
+const BUILD_ID='075c9745f0d7c8bb8eca1983a14bf389331dc5d98cd8406257d9745149e9d0e3';
 const APP='CANVAS';
 const CACHE_PREFIX='zeroone-canvas-release-';
-const APP_VERSION='56';
+const APP_VERSION='57';
 const APP_ASSETS=["1_App/css/styles.css","1_App/img/zeroone_icon.png","1_App/img/zeroone_icon_512.png","1_App/js/app.js","1_App/js/folder-access.js","1_App/js/onedrive-config.js","1_App/js/onedrive-storage.js","1_App/js/vendor/msal-browser.min.js","1_App/manifest.webmanifest","Basketball_Tactics_Board.html","apple-touch-zero-one-180-20261007m.png","boot.js","brand-entry.js","index.html","manifest.webmanifest","safari-canvas-192-20261007j.png","service-worker.js","zero-one-connection.css","zero-one-connection.js","zero-one-update.css","zero-one-update.js"];
 const clientBuilds=new Map();
 let releasePromise;
